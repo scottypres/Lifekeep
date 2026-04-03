@@ -8,6 +8,8 @@ import { TrainingExport } from "./TrainingPanel";
 import BatchTrainer from "./BatchTrainer";
 import PromptEditor from "./PromptEditor";
 import TrainingManager from "./TrainingManager";
+import LLMCompare from "./LLMCompare";
+import LLMSettings from "./LLMSettings";
 
 export default function App() {
   const [view, setView] = useState("home");
@@ -157,6 +159,30 @@ export default function App() {
         fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
       }}>← Back</button>
       <TrainingManager />
+    </div>
+  );
+
+  if (view === "compare") return (
+    <div>
+      <button onClick={() => setView("home")} style={{
+        position: "fixed", top: 16, left: 16, zIndex: 9999,
+        background: "#2D5A3D", color: "#fff", border: "none", borderRadius: 10,
+        padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      }}>← Back</button>
+      <LLMCompare />
+    </div>
+  );
+
+  if (view === "settings") return (
+    <div>
+      <button onClick={() => setView("home")} style={{
+        position: "fixed", top: 16, left: 16, zIndex: 9999,
+        background: "#2D5A3D", color: "#fff", border: "none", borderRadius: 10,
+        padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      }}>← Back</button>
+      <LLMSettings />
     </div>
   );
 
@@ -313,6 +339,25 @@ export default function App() {
                   ✦ DEV MODE ONLY
                 </div>
               </button>
+
+              <button onClick={() => setView("compare")} style={{
+                background: "linear-gradient(135deg, #8B5E3C 0%, #6B4226 100%)", color: "#fff", border: "none",
+                borderRadius: 16, padding: "22px 28px", cursor: "pointer",
+                textAlign: "left", transition: "transform 0.15s",
+                boxShadow: "0 4px 16px rgba(139,94,60,0.3)",
+              }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+              >
+                <div style={{ fontSize: 24, marginBottom: 8 }}>&#9878;</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>LLM Comparison Tester</div>
+                <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4, lineHeight: 1.5 }}>
+                  Run the same scan through Claude, GPT, and Gemini side-by-side. Compare accuracy, speed, and cost across 5 pipeline steps.
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 10, fontWeight: 600, letterSpacing: 0.5 }}>
+                  ✦ DEV MODE ONLY
+                </div>
+              </button>
             </>
           )}
 
@@ -342,6 +387,12 @@ export default function App() {
             padding: "4px 12px", borderRadius: 20, border: "1px solid #E0DCD4",
             background: "#fff", fontSize: 11, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit",
           }}>Switch</button>
+          {mode === "dev" && (
+            <button onClick={() => setView("settings")} style={{
+              padding: "4px 12px", borderRadius: 20, border: "1px solid #E0DCD4",
+              background: "#fff", fontSize: 11, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit",
+            }}>API Keys</button>
+          )}
         </div>
 
         <p style={{
