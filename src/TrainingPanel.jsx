@@ -62,7 +62,27 @@ async function saveToServer(entry) {
   }
 }
 
-export function TrainingPanel({ aiResult, onSaved, imagePreview }) {
+function compressToThumbnail(base64) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 200;
+      let w = img.width, h = img.height;
+      if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+      else { w = Math.round(w * maxDim / h); h = maxDim; }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.3).split(",")[1]);
+    };
+    img.onerror = () => resolve(null);
+    img.src = "data:image/jpeg;base64," + base64;
+  });
+}
+
+export function TrainingPanel({ aiResult, inputImage, onSaved }) {
   const [identCorrect, setIdentCorrect] = useState(null);
   const [identCorrection, setIdentCorrection] = useState("");
   const [taskFeedback, setTaskFeedback] = useState({});
@@ -125,17 +145,20 @@ export function TrainingPanel({ aiResult, onSaved, imagePreview }) {
   const handleSave = async () => {
     setSaving(true);
 
-    // Create small thumbnail of original image for training reference
-    const thumbnail = await makeThumbnail(imagePreview);
+    // Build OCR text from AI result fields
+    const ocrParts = [aiResult?.item, aiResult?.brand, aiResult?.model].filter(Boolean);
+    const ocrText = ocrParts.join(" — ");
 
-    // Extract all text the AI read from the image
-    const ocrText = aiResult?.rawText
-      || aiResult?.allVisibleText
-      || aiResult?.howDetermined
-      || null;
+    // Compress input image to thumbnail for storage
+    let thumbnail = null;
+    if (inputImage) {
+      try { thumbnail = await compressToThumbnail(inputImage); } catch { /* optional */ }
+    }
 
     const entry = {
       aiResult,
+      inputImage: thumbnail,
+      ocrText: ocrText || null,
       identificationFeedback: { correct: identCorrect, correction: identCorrection || null },
       taskFeedback: Object.values(taskFeedback),
       overallNotes: overallNotes || null,

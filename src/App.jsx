@@ -6,6 +6,8 @@ import UniversalScanner from "./UniversalScanner";
 import Reminders from "./Reminders";
 import { TrainingExport } from "./TrainingPanel";
 import BatchTrainer from "./BatchTrainer";
+import PromptEditor from "./PromptEditor";
+import TrainingManager from "./TrainingManager";
 
 export default function App() {
   const [view, setView] = useState("home");
@@ -134,6 +136,30 @@ export default function App() {
     </div>
   );
 
+  if (view === "prompt-editor") return (
+    <div>
+      <button onClick={() => setView("home")} style={{
+        position: "fixed", top: 16, left: 16, zIndex: 9999,
+        background: "#2D5A3D", color: "#fff", border: "none", borderRadius: 10,
+        padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      }}>← Back</button>
+      <PromptEditor />
+    </div>
+  );
+
+  if (view === "training-manager") return (
+    <div>
+      <button onClick={() => setView("home")} style={{
+        position: "fixed", top: 16, left: 16, zIndex: 9999,
+        background: "#2D5A3D", color: "#fff", border: "none", borderRadius: 10,
+        padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      }}>← Back</button>
+      <TrainingManager />
+    </div>
+  );
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -230,24 +256,64 @@ export default function App() {
           </button>
 
           {mode === "dev" && (
-            <button onClick={() => setView("batch")} style={{
-              background: "linear-gradient(135deg, #8B5E3C 0%, #A67C52 100%)", color: "#fff", border: "none",
-              borderRadius: 16, padding: "22px 28px", cursor: "pointer",
-              textAlign: "left", transition: "transform 0.15s",
-              boxShadow: "0 4px 16px rgba(139,94,60,0.3)",
-            }}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-            >
-              <div style={{ fontSize: 24, marginBottom: 8 }}>📦</div>
-              <div style={{ fontSize: 18, fontWeight: 700 }}>Batch Training</div>
-              <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4, lineHeight: 1.5 }}>
-                Upload multiple product photos at once — scan all through the same AI pipeline, then rate each result to build training data
-              </div>
-              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 10, fontWeight: 600, letterSpacing: 0.5 }}>
-                ✦ DEV MODE ONLY
-              </div>
-            </button>
+            <>
+              <button onClick={() => setView("batch")} style={{
+                background: "linear-gradient(135deg, #8B5E3C 0%, #A67C52 100%)", color: "#fff", border: "none",
+                borderRadius: 16, padding: "22px 28px", cursor: "pointer",
+                textAlign: "left", transition: "transform 0.15s",
+                boxShadow: "0 4px 16px rgba(139,94,60,0.3)",
+              }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+              >
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📦</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>Batch Training</div>
+                <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4, lineHeight: 1.5 }}>
+                  Upload multiple product photos at once — scan all through the same AI pipeline, then rate each result to build training data
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 10, fontWeight: 600, letterSpacing: 0.5 }}>
+                  ✦ DEV MODE ONLY
+                </div>
+              </button>
+
+              <button onClick={() => setView("training-manager")} style={{
+                background: "linear-gradient(135deg, #D4932A 0%, #C4A265 100%)", color: "#fff", border: "none",
+                borderRadius: 16, padding: "22px 28px", cursor: "pointer",
+                textAlign: "left", transition: "transform 0.15s",
+                boxShadow: "0 4px 16px rgba(196,162,101,0.3)",
+              }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+              >
+                <div style={{ fontSize: 24, marginBottom: 8 }}>🎯</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>Training Log</div>
+                <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4, lineHeight: 1.5 }}>
+                  Browse, edit, and delete training feedback entries. Download data or use AI to suggest prompt improvements.
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 10, fontWeight: 600, letterSpacing: 0.5 }}>
+                  ✦ DEV MODE ONLY
+                </div>
+              </button>
+
+              <button onClick={() => setView("prompt-editor")} style={{
+                background: "linear-gradient(135deg, #7B3FBF 0%, #9B5FDF 100%)", color: "#fff", border: "none",
+                borderRadius: 16, padding: "22px 28px", cursor: "pointer",
+                textAlign: "left", transition: "transform 0.15s",
+                boxShadow: "0 4px 16px rgba(123,63,191,0.3)",
+              }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+              >
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📝</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>Prompt Editor</div>
+                <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4, lineHeight: 1.5 }}>
+                  View and edit the AI system prompt. Save versions, restore previous prompts, and track prompt evolution over time.
+                </div>
+                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 10, fontWeight: 600, letterSpacing: 0.5 }}>
+                  ✦ DEV MODE ONLY
+                </div>
+              </button>
+            </>
           )}
 
           <button onClick={() => setView("reminders")} style={{

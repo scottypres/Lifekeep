@@ -15,6 +15,21 @@ export function saveTrainingEntry(entry) {
   return entry;
 }
 
+export function updateTrainingEntry(id, updates) {
+  const log = getTrainingLog();
+  const idx = log.findIndex(e => e.id === id);
+  if (idx === -1) return null;
+  log[idx] = { ...log[idx], ...updates, id: log[idx].id, timestamp: log[idx].timestamp };
+  localStorage.setItem(TRAINING_KEY, JSON.stringify(log));
+  return log[idx];
+}
+
+export function deleteTrainingEntry(id) {
+  const log = getTrainingLog().filter(e => e.id !== id);
+  localStorage.setItem(TRAINING_KEY, JSON.stringify(log));
+  return log;
+}
+
 export function clearTrainingLog() {
   localStorage.removeItem(TRAINING_KEY);
 }
