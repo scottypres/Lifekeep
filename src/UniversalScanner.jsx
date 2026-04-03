@@ -121,50 +121,117 @@ export default function UniversalScanner() {
   const [error, setError] = useState(null);
   const [phase, setPhase] = useState("");
   const [filter, setFilter] = useState("all");
+  const [debugLog, setDebugLog] = useState([]);
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
 
+  const addLog = (msg) => setDebugLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+
   const handleFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError(null); setResult(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreview(reader.result);
-      setImage({ base64: reader.result.split(",")[1], mediaType: file.type || "image/jpeg" });
-    };
-    reader.readAsDataURL(file);
+    try {
+      setDebugLog([]);
+      addLog("handleFile triggered");
+      const file = e.target.files?.[0];
+      if (!file) { addLog("No file selected"); return; }
+      addLog(`File: ${file.name}, type: ${file.type}, size: ${(file.size / 1024).toFixed(1)}KB`);
+      setError(null); setResult(null);
+      const reader = new FileReader();
+      reader.onerror = () => {
+        addLog(`FileReader error: ${reader.error}`);
+        setError(`FileReader error: ${reader.error}`);
+      };
+      reader.onload = () => {
+        try {
+          addLog(`FileReader done, result length: ${reader.result?.length || 0}`);
+          setPreview(reader.result);
+          const base64 = reader.result.split(",")[1];
+          addLog(`Base64 length: ${base64?.length || 0}`);
+          setImage({ base64, mediaType: file.type || "image/jpeg" });
+          addLog("Ready to scan");
+        } catch (err) {
+          addLog(`reader.onload error: ${err.name}: ${err.message}`);
+          setError(`File processing: ${err.name}: ${err.message}`);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      addLog(`handleFile error: ${err.name}: ${err.message}`);
+      setError(`File select: ${err.name}: ${err.message}`);
+    }
   };
 
   const handleScan = async () => {
-    if (!image) return;
+    if (!image) { addLog("No image"); return; }
     setLoading(true); setError(null); setResult(null);
+    addLog("=== SCAN START ===");
 
     try {
-      setPhase("Uploading image...");
-      await new Promise(r => setTimeout(r, 400));
-      setPhase("Identifying item...");
-      
-      const resp = await fetch("/api/identify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: image.base64, mediaType: image.mediaType }),
-      });
+      addLog(`base64 length: ${image.base64?.length}, type: ${image.mediaType}`);
+      setPhase("Preparing request...");
 
-      setPhase("Building maintenance schedule...");
-      await new Promise(r => setTimeout(r, 300));
-      const data = await resp.json();
+      let bodyStr;
+      try {
+        bodyStr = JSON.stringify({ image: image.base64, mediaType: image.mediaType });
+        addLog(`JSON body size: ${(bodyStr.length / 1024).toFixed(1)}KB`);
+      } catch (jsonErr) {
+        addLog(`JSON.stringify failed: ${jsonErr.name}: ${jsonErr.message}`);
+        throw jsonErr;
+      }
 
-      if (!resp.ok) throw new Error(data.error || `Server error ${resp.status}`);
-      if (data.error && !data.maintenanceSchedule) throw new Error(data.error);
+      setPhase("Sending to /api/identify...");
+      addLog("fetch starting...");
 
-      setPhase("Generating product links...");
-      await new Promise(r => setTimeout(r, 200));
+      let resp;
+      try {
+        resp = await fetch("/api/identify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: bodyStr,
+        });
+        addLog(`fetch done — status: ${resp.status} ${resp.statusText}`);
+        addLog(`content-type: ${resp.headers.get("content-type")}`);
+      } catch (fetchErr) {
+        addLog(`fetch threw: ${fetchErr.name}: ${fetchErr.message}`);
+        throw new Error(`Network error: ${fetchErr.name}: ${fetchErr.message}`);
+      }
+
+      setPhase("Reading response...");
+      let rawText;
+      try {
+        rawText = await resp.text();
+        addLog(`body length: ${rawText.length}`);
+        addLog(`body preview: ${rawText.slice(0, 300)}`);
+      } catch (textErr) {
+        addLog(`resp.text() threw: ${textErr.name}: ${textErr.message}`);
+        throw new Error(`Response read error: ${textErr.name}: ${textErr.message}`);
+      }
+
+      let data;
+      try {
+        data = JSON.parse(rawText);
+        addLog("JSON parsed OK");
+      } catch (parseErr) {
+        addLog(`JSON.parse failed: ${parseErr.message}`);
+        throw new Error(`Not JSON (status ${resp.status}): ${rawText.slice(0, 500)}`);
+      }
+
+      if (!resp.ok) {
+        addLog(`API error: ${data.error || resp.status}`);
+        throw new Error(data.error || `Server ${resp.status}`);
+      }
+      if (data.error && !data.maintenanceSchedule) {
+        addLog(`Data error: ${data.error}`);
+        throw new Error(data.error);
+      }
+
+      addLog(`SUCCESS — ${data.maintenanceSchedule?.length || 0} tasks, item: ${data.item}`);
       setResult(data);
     } catch (err) {
-      setError(err.message);
+      addLog(`FAILED: ${err.name}: ${err.message}`);
+      setError(`${err.name}: ${err.message}`);
     } finally {
       setLoading(false); setPhase("");
+      addLog("=== SCAN END ===");
     }
   };
 
@@ -294,7 +361,15 @@ export default function UniversalScanner() {
               Identify & Find Maintenance
             </button>
             {error && (
-              <div style={{ marginTop: 16, padding: "14px 20px", background: "#FDF0EE", borderRadius: 12, fontSize: 13, color: "#C44B3F", lineHeight: 1.6 }}>{error}</div>
+              <div style={{ marginTop: 16, padding: "14px 20px", background: "#FDF0EE", borderRadius: 12, fontSize: 13, color: "#C44B3F", lineHeight: 1.6, wordBreak: "break-word" }}>{error}</div>
+            )}
+            {debugLog.length > 0 && (
+              <div style={{ marginTop: 12, padding: "14px 16px", background: "#1A1A1A", borderRadius: 12, maxHeight: 300, overflowY: "auto" }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#4ADE80", marginBottom: 8, letterSpacing: 1 }}>DEBUG LOG</div>
+                {debugLog.map((log, i) => (
+                  <div key={i} style={{ fontSize: 11, color: "#9CA3AF", fontFamily: "monospace", lineHeight: 1.8, wordBreak: "break-all" }}>{log}</div>
+                ))}
+              </div>
             )}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { reset(); handleFile(e); }} style={{ display: "none" }} />
             <button onClick={() => { reset(); setTimeout(() => cameraRef.current?.click(), 100); }} style={{
@@ -321,6 +396,14 @@ export default function UniversalScanner() {
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
               <div style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{phase}</div>
               <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 6 }}>AI is analyzing your photo</div>
+              {debugLog.length > 0 && (
+                <div style={{ marginTop: 20, padding: "14px 16px", background: "#1A1A1A", borderRadius: 12, maxHeight: 250, overflowY: "auto", textAlign: "left" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#4ADE80", marginBottom: 8, letterSpacing: 1 }}>DEBUG LOG</div>
+                  {debugLog.map((log, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#9CA3AF", fontFamily: "monospace", lineHeight: 1.8, wordBreak: "break-all" }}>{log}</div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
