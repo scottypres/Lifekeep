@@ -3,6 +3,7 @@ import LifekeepPrototype from "./LifekeepPrototype";
 import VehicleLookup from "./VehicleLookup";
 import HVACScanner from "./HVACScanner";
 import UniversalScanner from "./UniversalScanner";
+import Reminders from "./Reminders";
 
 export default function App() {
   const [view, setView] = useState("home");
@@ -52,6 +53,18 @@ export default function App() {
         fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
       }}>← Back</button>
       <UniversalScanner />
+    </div>
+  );
+
+  if (view === "reminders") return (
+    <div>
+      <button onClick={() => setView("home")} style={{
+        position: "fixed", top: 16, left: 16, zIndex: 9999,
+        background: "#2D5A3D", color: "#fff", border: "none", borderRadius: 10,
+        padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      }}>← Back</button>
+      <Reminders />
     </div>
   );
 
@@ -147,6 +160,21 @@ export default function App() {
             </div>
             <div style={{ fontSize: 11, opacity: 0.7, marginTop: 10, fontWeight: 600, letterSpacing: 0.5 }}>
               ✦ LLM SUITABILITY DEMO
+            </div>
+          </button>
+
+          <button onClick={() => setView("reminders")} style={{
+            background: "#fff", color: "#1A1A1A", border: "2px solid #2D5A3D",
+            borderRadius: 16, padding: "22px 28px", cursor: "pointer",
+            textAlign: "left", transition: "transform 0.15s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+          >
+            <div style={{ fontSize: 24, marginBottom: 8 }}>📋</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#2D5A3D" }}>My Reminders</div>
+            <div style={{ fontSize: 13, color: "#5A5A5A", marginTop: 4, lineHeight: 1.5 }}>
+              View your maintenance dashboard — track due dates, mark completions, and shop for parts
             </div>
           </button>
         </div>

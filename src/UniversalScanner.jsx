@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { saveReminder, getReminders } from "./reminders.js";
 
 function amazonLink(query) {
   return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&tag=lifekeep-20`;
@@ -21,10 +22,30 @@ const DIFFICULTY_STYLES = {
   professional: { color: "#7B6B9E", bg: "#F0ECF5", label: "👷 Professional" },
 };
 
-function MaintenanceCard({ task, index }) {
+function MaintenanceCard({ task, index, itemInfo }) {
   const [expanded, setExpanded] = useState(false);
+  const [scheduled, setScheduled] = useState(false);
   const priority = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.medium;
   const difficulty = DIFFICULTY_STYLES[task.difficulty] || DIFFICULTY_STYLES.diy;
+
+  const handleSchedule = (e) => {
+    e.stopPropagation();
+    saveReminder({
+      task: task.task,
+      interval: task.interval,
+      priority: task.priority,
+      difficulty: task.difficulty,
+      estimatedCost: task.estimatedCost,
+      description: task.description,
+      products: task.products || [],
+      itemName: itemInfo?.item || "Unknown Item",
+      itemBrand: itemInfo?.brand,
+      itemModel: itemInfo?.model,
+      itemCategory: itemInfo?.category || "other",
+    });
+    setScheduled(true);
+    setTimeout(() => setScheduled(false), 2000);
+  };
 
   return (
     <div style={{
@@ -107,6 +128,18 @@ function MaintenanceCard({ task, index }) {
               ))}
             </div>
           )}
+
+          {/* Schedule Reminder Button */}
+          <button onClick={handleSchedule} disabled={scheduled} style={{
+            width: "100%", padding: 14, marginTop: 12,
+            background: scheduled ? "#E8F0EA" : "#2D5A3D",
+            color: scheduled ? "#2D5A3D" : "#fff",
+            border: "none", borderRadius: 12,
+            fontSize: 14, fontWeight: 700, cursor: scheduled ? "default" : "pointer",
+            fontFamily: "inherit", transition: "all 0.2s",
+          }}>
+            {scheduled ? "✓ Reminder Scheduled!" : `🔔 Schedule Recurring Reminder`}
+          </button>
         </div>
       )}
     </div>
@@ -121,6 +154,7 @@ export default function UniversalScanner() {
   const [error, setError] = useState(null);
   const [phase, setPhase] = useState("");
   const [filter, setFilter] = useState("all");
+  const [allScheduled, setAllScheduled] = useState(false);
   const [debugLog, setDebugLog] = useState([]);
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
@@ -273,7 +307,7 @@ export default function UniversalScanner() {
   };
 
   const reset = () => {
-    setImage(null); setPreview(null); setResult(null); setError(null); setPhase(""); setFilter("all");
+    setImage(null); setPreview(null); setResult(null); setError(null); setPhase(""); setFilter("all"); setAllScheduled(false);
   };
 
   const schedule = result?.maintenanceSchedule || [];
@@ -534,7 +568,7 @@ export default function UniversalScanner() {
             <div style={{ fontSize: 12, fontWeight: 600, color: "#9A9A9A", letterSpacing: 1, marginBottom: 10, textTransform: "uppercase" }}>
               Maintenance Schedule · {filtered.length} tasks
             </div>
-            {filtered.map((task, i) => <MaintenanceCard key={i} task={task} index={i} />)}
+            {filtered.map((task, i) => <MaintenanceCard key={i} task={task} index={i} itemInfo={result} />)}
 
             {/* Tips */}
             {result.tips && result.tips.length > 0 && (
@@ -554,6 +588,49 @@ export default function UniversalScanner() {
                 ))}
               </div>
             )}
+
+            {/* Schedule All Reminders */}
+            <div style={{
+              marginTop: 20, background: "#fff", borderRadius: 14, padding: "20px",
+              border: "2px solid #2D5A3D",
+            }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A", marginBottom: 6 }}>
+                🔔 Track This Item
+              </div>
+              <div style={{ fontSize: 13, color: "#5A5A5A", lineHeight: 1.6, marginBottom: 14 }}>
+                Schedule recurring reminders for all {schedule.length} maintenance tasks. You'll be notified when each one is due.
+              </div>
+              <button onClick={() => {
+                schedule.forEach(task => {
+                  saveReminder({
+                    task: task.task, interval: task.interval, priority: task.priority,
+                    difficulty: task.difficulty, estimatedCost: task.estimatedCost,
+                    description: task.description, products: task.products || [],
+                    itemName: result?.item || "Unknown", itemBrand: result?.brand,
+                    itemModel: result?.model, itemCategory: result?.category || "other",
+                  });
+                });
+                setAllScheduled(true);
+              }} disabled={allScheduled} style={{
+                width: "100%", padding: 16,
+                background: allScheduled ? "#E8F0EA" : "linear-gradient(135deg, #2D5A3D 0%, #3A7550 100%)",
+                color: allScheduled ? "#2D5A3D" : "#fff",
+                border: "none", borderRadius: 12,
+                fontSize: 16, fontWeight: 700, cursor: allScheduled ? "default" : "pointer",
+                fontFamily: "inherit", transition: "all 0.3s",
+                boxShadow: allScheduled ? "none" : "0 4px 12px rgba(45,90,61,0.3)",
+              }}>
+                {allScheduled ? `✓ All ${schedule.length} Reminders Scheduled!` : `Schedule All ${schedule.length} Reminders`}
+              </button>
+              {allScheduled && (
+                <div style={{
+                  marginTop: 12, padding: "12px 16px", background: "#E8F0EA", borderRadius: 10,
+                  fontSize: 13, color: "#2D5A3D", textAlign: "center", lineHeight: 1.6,
+                }}>
+                  View your reminders dashboard from the home screen to track due dates, mark completions, and shop for parts.
+                </div>
+              )}
+            </div>
 
             {/* Scan another */}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { reset(); handleFile(e); }} style={{ display: "none" }} />
