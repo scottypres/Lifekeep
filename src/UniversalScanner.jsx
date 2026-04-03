@@ -1,26 +1,32 @@
 import { useState, useRef } from "react";
-import { saveReminder, getReminders } from "./reminders.js";
+import { saveReminder } from "./reminders.js";
 import { TrainingPanel } from "./TrainingPanel.jsx";
 import ProductLinks from "./ProductLinks.jsx";
 
 const CATEGORY_ICONS = {
   appliance: "🏠", vehicle: "🚗", outdoor: "🌿", plumbing: "🔧", electrical: "⚡",
   hvac: "❄️", structure: "🏗️", furniture: "🪑", electronics: "💻", tool: "🛠️",
-  sporting: "⚽", other: "📦",
+  sporting: "⚽", fitness: "💪", pet: "🐾", "personal-care": "🧴", hobby: "🎨",
+  other: "📦",
 };
 
 const PRIORITY_STYLES = {
-  high: { color: "#C44B3F", bg: "#FDF0EE", label: "High Priority" },
-  medium: { color: "#D4932A", bg: "#FDF6E8", label: "Medium" },
-  low: { color: "#2D5A3D", bg: "#E8F0EA", label: "Low" },
+  critical: { color: "#C44B3F", bg: "#FDF0EE", label: "Critical" },
+  high: { color: "#D4932A", bg: "#FDF6E8", label: "High" },
+  medium: { color: "#5A7ABF", bg: "#F0F4FF", label: "Medium" },
+  low: { color: "#9A9A9A", bg: "#F5F5F5", label: "Low" },
 };
 
 const DIFFICULTY_STYLES = {
-  diy: { color: "#2D5A3D", bg: "#E8F0EA", label: "🔧 DIY" },
-  professional: { color: "#7B6B9E", bg: "#F0ECF5", label: "👷 Professional" },
+  easy: { color: "#2D5A3D", bg: "#E8F0EA", label: "Easy" },
+  moderate: { color: "#D4932A", bg: "#FDF6E8", label: "Moderate" },
+  hard: { color: "#C44B3F", bg: "#FDF0EE", label: "Hard" },
+  "professional-only": { color: "#7B6B9E", bg: "#F0ECF5", label: "Pro Only" },
+  diy: { color: "#2D5A3D", bg: "#E8F0EA", label: "DIY" },
+  professional: { color: "#7B6B9E", bg: "#F0ECF5", label: "Professional" },
 };
 
-function MaintenanceCard({ task, index, itemInfo }) {
+function MaintenanceCard({ task, itemInfo }) {
   const [expanded, setExpanded] = useState(false);
   const [scheduled, setScheduled] = useState(false);
   const priority = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.medium;
@@ -106,17 +112,34 @@ function MaintenanceCard({ task, index, itemInfo }) {
             </div>
           )}
 
-          {/* Schedule Reminder Button */}
-          <button onClick={handleSchedule} disabled={scheduled} style={{
-            width: "100%", padding: 14, marginTop: 12,
-            background: scheduled ? "#E8F0EA" : "#2D5A3D",
-            color: scheduled ? "#2D5A3D" : "#fff",
-            border: "none", borderRadius: 12,
-            fontSize: 14, fontWeight: 700, cursor: scheduled ? "default" : "pointer",
-            fontFamily: "inherit", transition: "all 0.2s",
-          }}>
-            {scheduled ? "✓ Reminder Scheduled!" : `🔔 Schedule Recurring Reminder`}
-          </button>
+          {/* Action Buttons */}
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <button onClick={handleSchedule} disabled={scheduled} style={{
+              flex: 1, padding: 14,
+              background: scheduled ? "#E8F0EA" : "#2D5A3D",
+              color: scheduled ? "#2D5A3D" : "#fff",
+              border: "none", borderRadius: 12,
+              fontSize: 14, fontWeight: 700, cursor: scheduled ? "default" : "pointer",
+              fontFamily: "inherit", transition: "all 0.2s",
+            }}>
+              {scheduled ? "✓ Scheduled!" : "🔔 Remind Me"}
+            </button>
+            {task.serviceOption && (
+              <button onClick={(e) => {
+                e.stopPropagation();
+                const query = encodeURIComponent(`${task.task} ${itemInfo?.item || ""} service near me`);
+                window.open(`https://www.google.com/search?q=${query}`, "_blank");
+              }} style={{
+                padding: "14px 16px",
+                background: "#F0ECF5", color: "#7B6B9E",
+                border: "none", borderRadius: 12,
+                fontSize: 13, fontWeight: 700, cursor: "pointer",
+                fontFamily: "inherit", whiteSpace: "nowrap",
+              }}>
+                📞 Find Service
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -288,10 +311,10 @@ export default function UniversalScanner({ mode }) {
   };
 
   const schedule = result?.maintenanceSchedule || [];
-  const priorities = [...new Set(schedule.map(s => s.priority))];
-  const priorityOrder = { high: 0, medium: 1, low: 2 };
-  const filtered = (filter === "all" ? schedule : schedule.filter(s => s.priority === filter))
-    .sort((a, b) => (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2));
+  const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+  const sortedSchedule = [...schedule].sort((a, b) => (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3));
+  const priorities = [...new Set(sortedSchedule.map(s => s.priority))];
+  const filtered = (filter === "all" ? sortedSchedule : sortedSchedule.filter(s => s.priority === filter));
   const totalProducts = schedule.reduce((sum, t) => sum + (t.products?.length || 0), 0);
   const catIcon = CATEGORY_ICONS[result?.category] || "📦";
 
@@ -612,7 +635,7 @@ export default function UniversalScanner({ mode }) {
             </div>
 
             {/* Training Feedback — dev mode only */}
-            {mode === "dev" && <TrainingPanel aiResult={result} />}
+            {mode === "dev" && <TrainingPanel aiResult={result} inputImage={image?.base64} />}
 
             {/* Scan another */}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { reset(); handleFile(e); }} style={{ display: "none" }} />

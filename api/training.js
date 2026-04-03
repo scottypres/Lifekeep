@@ -19,7 +19,7 @@ function writeLog(data) {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
   if (req.method === "OPTIONS") return res.status(200).end();
@@ -47,7 +47,9 @@ export default async function handler(req, res) {
       output += `Brand: ${entry.aiResult?.brand || "Unknown"}\n`;
       output += `Model: ${entry.aiResult?.model || "Unknown"}\n`;
       output += `Category: ${entry.aiResult?.category || "Unknown"}\n`;
-      output += `Confidence: ${entry.aiResult?.confidence || "Unknown"}\n\n`;
+      output += `Confidence: ${entry.aiResult?.confidence || "Unknown"}\n`;
+      if (entry.ocrText) output += `OCR Text: ${entry.ocrText}\n`;
+      output += `\n`;
 
       if (entry.identificationFeedback) {
         output += `### Identification\n`;
@@ -106,8 +108,37 @@ export default async function handler(req, res) {
     }
   }
 
-  // DELETE — clear log
+  // PUT — update a specific training entry by id
+  if (req.method === "PUT") {
+    try {
+      const { id, updates } = req.body;
+      if (!id) return res.status(400).json({ error: "Entry id required" });
+
+      const log = readLog();
+      const idx = log.findIndex(e => e.id === id);
+      if (idx === -1) return res.status(404).json({ error: "Entry not found" });
+
+      log[idx] = { ...log[idx], ...updates, id: log[idx].id, timestamp: log[idx].timestamp };
+      writeLog(log);
+
+      return res.status(200).json({ success: true, id, total: log.length });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
+
+  // DELETE — clear log or delete single entry
   if (req.method === "DELETE") {
+    const id = req.query.id;
+    if (id) {
+      const log = readLog();
+      const filtered = log.filter(e => e.id !== id);
+      if (filtered.length === log.length) {
+        return res.status(404).json({ error: "Entry not found" });
+      }
+      writeLog(filtered);
+      return res.status(200).json({ success: true, deleted: id, total: filtered.length });
+    }
     writeLog([]);
     return res.status(200).json({ success: true, message: "Training log cleared" });
   }
