@@ -5,6 +5,7 @@ import HVACScanner from "./HVACScanner";
 import UniversalScanner from "./UniversalScanner";
 import Reminders from "./Reminders";
 import { TrainingExport } from "./TrainingPanel";
+import BatchTrainer from "./BatchTrainer";
 
 export default function App() {
   const [view, setView] = useState("home");
@@ -121,6 +122,18 @@ export default function App() {
     </div>
   );
 
+  if (view === "batch") return (
+    <div>
+      <button onClick={() => setView("home")} style={{
+        position: "fixed", top: 16, left: 16, zIndex: 9999,
+        background: "#2D5A3D", color: "#fff", border: "none", borderRadius: 10,
+        padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      }}>← Back</button>
+      <BatchTrainer />
+    </div>
+  );
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -215,6 +228,27 @@ export default function App() {
               ✦ LLM SUITABILITY DEMO
             </div>
           </button>
+
+          {mode === "dev" && (
+            <button onClick={() => setView("batch")} style={{
+              background: "linear-gradient(135deg, #8B5E3C 0%, #A67C52 100%)", color: "#fff", border: "none",
+              borderRadius: 16, padding: "22px 28px", cursor: "pointer",
+              textAlign: "left", transition: "transform 0.15s",
+              boxShadow: "0 4px 16px rgba(139,94,60,0.3)",
+            }}
+              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+            >
+              <div style={{ fontSize: 24, marginBottom: 8 }}>📦</div>
+              <div style={{ fontSize: 18, fontWeight: 700 }}>Batch Training</div>
+              <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4, lineHeight: 1.5 }}>
+                Upload multiple product photos at once — scan all through the same AI pipeline, then rate each result to build training data
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.7, marginTop: 10, fontWeight: 600, letterSpacing: 0.5 }}>
+                ✦ DEV MODE ONLY
+              </div>
+            </button>
+          )}
 
           <button onClick={() => setView("reminders")} style={{
             background: "#fff", color: "#1A1A1A", border: "2px solid #2D5A3D",
