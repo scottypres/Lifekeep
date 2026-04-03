@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { saveReminder, getReminders } from "./reminders.js";
+import { TrainingPanel } from "./TrainingPanel.jsx";
 import ProductLinks from "./ProductLinks.jsx";
 
 const CATEGORY_ICONS = {
@@ -609,6 +610,9 @@ export default function UniversalScanner() {
                 </div>
               )}
             </div>
+
+            {/* Training Feedback */}
+            <TrainingPanel aiResult={result} />
 
             {/* Scan another */}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { reset(); handleFile(e); }} style={{ display: "none" }} />

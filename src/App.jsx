@@ -4,6 +4,7 @@ import VehicleLookup from "./VehicleLookup";
 import HVACScanner from "./HVACScanner";
 import UniversalScanner from "./UniversalScanner";
 import Reminders from "./Reminders";
+import { TrainingExport } from "./TrainingPanel";
 
 export default function App() {
   const [view, setView] = useState("home");
@@ -177,6 +178,10 @@ export default function App() {
               View your maintenance dashboard — track due dates, mark completions, and shop for parts
             </div>
           </button>
+        </div>
+
+        <div style={{ marginTop: 20 }}>
+          <TrainingExport />
         </div>
 
         <p style={{
