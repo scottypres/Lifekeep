@@ -123,7 +123,7 @@ function MaintenanceCard({ task, index, itemInfo }) {
   );
 }
 
-export default function UniversalScanner() {
+export default function UniversalScanner({ mode }) {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -611,8 +611,8 @@ export default function UniversalScanner() {
               )}
             </div>
 
-            {/* Training Feedback */}
-            <TrainingPanel aiResult={result} />
+            {/* Training Feedback — dev mode only */}
+            {mode === "dev" && <TrainingPanel aiResult={result} />}
 
             {/* Scan another */}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { reset(); handleFile(e); }} style={{ display: "none" }} />

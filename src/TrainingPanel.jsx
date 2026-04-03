@@ -1,5 +1,66 @@
 import { useState } from "react";
-import { saveTrainingEntry, getTrainingLog, exportTrainingLog, clearTrainingLog } from "./training.js";
+
+const TASK_TEMPLATES = [
+  "Wrong specification/size",
+  "Wrong part number",
+  "Wrong interval — too frequent",
+  "Wrong interval — not frequent enough",
+  "Not applicable to this product",
+  "Missing important maintenance task",
+  "Wrong product recommendation",
+  "Generic search — needs specific part number",
+  "Wrong brand/model identification",
+  "Cost estimate is off",
+];
+
+const PRODUCT_TEMPLATES = [
+  "Wrong size/dimensions",
+  "Wrong part number",
+  "Search too generic — needs exact spec",
+  "Wrong product for this model",
+  "Good recommendation",
+];
+
+function TemplateSelector({ templates, value, onChange }) {
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+        {templates.map((t, i) => (
+          <button key={i} onClick={() => onChange(value ? value + "; " + t : t)} style={{
+            padding: "4px 10px", borderRadius: 20, border: "1px solid #E0DCD4",
+            background: "#fff", fontSize: 11, color: "#5A5A5A", cursor: "pointer",
+            fontFamily: "inherit", whiteSpace: "nowrap",
+          }}>{t}</button>
+        ))}
+      </div>
+      <textarea
+        value={value || ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Add details or tap a template above..."
+        rows={2}
+        style={{
+          width: "100%", padding: "8px 10px", borderRadius: 8,
+          border: "1px solid #E0DCD4", fontSize: 12, fontFamily: "inherit",
+          resize: "vertical", boxSizing: "border-box",
+        }}
+      />
+    </div>
+  );
+}
+
+async function saveToServer(entry) {
+  try {
+    const resp = await fetch("/api/training", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    });
+    return await resp.json();
+  } catch (err) {
+    console.error("Server save failed:", err);
+    return null;
+  }
+}
 
 export function TrainingPanel({ aiResult, onSaved }) {
   const [identCorrect, setIdentCorrect] = useState(null);
@@ -7,6 +68,8 @@ export function TrainingPanel({ aiResult, onSaved }) {
   const [taskFeedback, setTaskFeedback] = useState({});
   const [overallNotes, setOverallNotes] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [serverResult, setServerResult] = useState(null);
 
   const schedule = aiResult?.maintenanceSchedule || [];
 
@@ -14,38 +77,50 @@ export function TrainingPanel({ aiResult, onSaved }) {
     setTaskFeedback(prev => ({ ...prev, [i]: { ...prev[i], rating, taskName: schedule[i]?.task } }));
   };
 
-  const setTaskIssue = (i, field, value) => {
-    setTaskFeedback(prev => ({ ...prev, [i]: { ...prev[i], [field]: value, taskName: schedule[i]?.task } }));
+  const setTaskFeedbackText = (i, feedbackText) => {
+    setTaskFeedback(prev => ({ ...prev, [i]: { ...prev[i], feedbackText, taskName: schedule[i]?.task } }));
+  };
+
+  const setProductFeedbackText = (taskIdx, prodIdx, feedbackText) => {
+    setTaskFeedback(prev => {
+      const existing = prev[taskIdx] || { taskName: schedule[taskIdx]?.task };
+      const pf = [...(existing.productFeedback || [])];
+      pf[prodIdx] = { ...pf[prodIdx], feedbackText, productName: schedule[taskIdx]?.products?.[prodIdx]?.name };
+      return { ...prev, [taskIdx]: { ...existing, productFeedback: pf } };
+    });
   };
 
   const setProductCorrect = (taskIdx, prodIdx, correct) => {
     setTaskFeedback(prev => {
       const existing = prev[taskIdx] || { taskName: schedule[taskIdx]?.task };
-      const pf = existing.productFeedback || [];
+      const pf = [...(existing.productFeedback || [])];
       pf[prodIdx] = { ...pf[prodIdx], correct, productName: schedule[taskIdx]?.products?.[prodIdx]?.name };
       return { ...prev, [taskIdx]: { ...existing, productFeedback: pf } };
     });
   };
 
-  const setProductCorrection = (taskIdx, prodIdx, correction) => {
-    setTaskFeedback(prev => {
-      const existing = prev[taskIdx] || { taskName: schedule[taskIdx]?.task };
-      const pf = existing.productFeedback || [];
-      pf[prodIdx] = { ...pf[prodIdx], correction, productName: schedule[taskIdx]?.products?.[prodIdx]?.name };
-      return { ...prev, [taskIdx]: { ...existing, productFeedback: pf } };
-    });
-  };
-
-  const handleSave = () => {
-    saveTrainingEntry({
+  const handleSave = async () => {
+    setSaving(true);
+    const entry = {
       aiResult,
-      identificationFeedback: {
-        correct: identCorrect,
-        correction: identCorrection || null,
-      },
+      identificationFeedback: { correct: identCorrect, correction: identCorrection || null },
       taskFeedback: Object.values(taskFeedback),
       overallNotes: overallNotes || null,
-    });
+    };
+
+    // Save to localStorage
+    try {
+      const log = JSON.parse(localStorage.getItem("lifekeep_training_log") || "[]");
+      entry.id = Date.now().toString(36);
+      entry.timestamp = new Date().toISOString();
+      log.push(entry);
+      localStorage.setItem("lifekeep_training_log", JSON.stringify(log));
+    } catch {}
+
+    // Save to server
+    const result = await saveToServer(entry);
+    setServerResult(result);
+    setSaving(false);
     setSaved(true);
     onSaved?.();
   };
@@ -59,7 +134,7 @@ export function TrainingPanel({ aiResult, onSaved }) {
         <div style={{ fontSize: 22, marginBottom: 6 }}>✅</div>
         <div style={{ fontSize: 15, fontWeight: 700, color: "#2D5A3D" }}>Feedback Saved</div>
         <div style={{ fontSize: 13, color: "#2D5A3D", marginTop: 4 }}>
-          {getTrainingLog().length} entries in training log. Export from the home screen.
+          {serverResult?.total ? `${serverResult.total} entries on server.` : "Saved locally."} Download from home screen.
         </div>
       </div>
     );
@@ -74,16 +149,14 @@ export function TrainingPanel({ aiResult, onSaved }) {
         <span style={{ fontSize: 20 }}>🎯</span>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A" }}>Training Feedback</div>
-          <div style={{ fontSize: 12, color: "#9A9A9A" }}>Help improve AI accuracy by rating this result</div>
+          <div style={{ fontSize: 12, color: "#9A9A9A" }}>Rate and correct this result to improve AI accuracy</div>
         </div>
       </div>
 
-      {/* Identification Rating */}
-      <div style={{
-        background: "#F9F8F5", borderRadius: 12, padding: "14px 16px", marginBottom: 14,
-      }}>
+      {/* Identification */}
+      <div style={{ background: "#F9F8F5", borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A", marginBottom: 8 }}>
-          Did it correctly identify: "{aiResult?.item}"?
+          Identified as: "{aiResult?.item}"
         </div>
         <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
           <button onClick={() => setIdentCorrect(true)} style={{
@@ -100,30 +173,23 @@ export function TrainingPanel({ aiResult, onSaved }) {
           }}>👎 Wrong</button>
         </div>
         {identCorrect === false && (
-          <input
-            value={identCorrection}
-            onChange={e => setIdentCorrection(e.target.value)}
-            placeholder="What is it actually? (e.g., Rheem 4-ton air handler)"
-            style={{
-              width: "100%", padding: "10px 12px", borderRadius: 8,
-              border: "1px solid #E0DCD4", fontSize: 13, fontFamily: "inherit",
-              boxSizing: "border-box",
-            }}
+          <input value={identCorrection} onChange={e => setIdentCorrection(e.target.value)}
+            placeholder="What is it actually?"
+            style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E0DCD4", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
           />
         )}
       </div>
 
-      {/* Task Ratings */}
+      {/* Task ratings */}
       <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A", marginBottom: 10 }}>
-        Rate each maintenance task:
+        Maintenance Tasks:
       </div>
       {schedule.map((task, i) => {
         const fb = taskFeedback[i] || {};
+        const [showFeedback, setShowFeedback] = useState(false);
         return (
-          <div key={i} style={{
-            background: "#F9F8F5", borderRadius: 10, padding: "12px 14px", marginBottom: 8,
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <div key={i} style={{ background: "#F9F8F5", borderRadius: 10, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#1A1A1A", flex: 1 }}>{task.task}</div>
               <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                 {["good", "ok", "bad"].map(r => (
@@ -136,69 +202,81 @@ export function TrainingPanel({ aiResult, onSaved }) {
                 ))}
               </div>
             </div>
+            <div style={{ fontSize: 12, color: "#9A9A9A", marginBottom: 4 }}>{task.interval} · {task.estimatedCost}</div>
 
-            {/* Product ratings within task */}
-            {task.products?.map((prod, pi) => (
-              <div key={pi} style={{
-                display: "flex", alignItems: "center", gap: 8, marginTop: 6,
-                paddingLeft: 12, fontSize: 12, color: "#5A5A5A",
-              }}>
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  🛒 {prod.name}
-                </span>
-                <button onClick={() => setProductCorrect(i, pi, true)} style={{
-                  padding: "2px 6px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11,
-                  background: taskFeedback[i]?.productFeedback?.[pi]?.correct === true ? "#2D5A3D" : "#E8E4DC",
-                  color: taskFeedback[i]?.productFeedback?.[pi]?.correct === true ? "#fff" : "#5A5A5A",
-                }}>✓</button>
-                <button onClick={() => setProductCorrect(i, pi, false)} style={{
-                  padding: "2px 6px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11,
-                  background: taskFeedback[i]?.productFeedback?.[pi]?.correct === false ? "#C44B3F" : "#E8E4DC",
-                  color: taskFeedback[i]?.productFeedback?.[pi]?.correct === false ? "#fff" : "#5A5A5A",
-                }}>✗</button>
+            {/* Products within task */}
+            {task.products?.map((prod, pi) => {
+              const pfb = fb.productFeedback?.[pi] || {};
+              const [showProdFb, setShowProdFb] = useState(false);
+              return (
+                <div key={pi} style={{ marginTop: 6, paddingLeft: 8, borderLeft: "2px solid #E0DCD4" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#5A5A5A" }}>
+                    <span>🛒</span>
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{prod.name}</span>
+                    <button onClick={() => setProductCorrect(i, pi, true)} style={{
+                      padding: "2px 6px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11,
+                      background: pfb.correct === true ? "#2D5A3D" : "#E8E4DC",
+                      color: pfb.correct === true ? "#fff" : "#5A5A5A",
+                    }}>✓</button>
+                    <button onClick={() => setProductCorrect(i, pi, false)} style={{
+                      padding: "2px 6px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11,
+                      background: pfb.correct === false ? "#C44B3F" : "#E8E4DC",
+                      color: pfb.correct === false ? "#fff" : "#5A5A5A",
+                    }}>✗</button>
+                    <button onClick={() => setShowProdFb(!showProdFb)} style={{
+                      padding: "2px 6px", borderRadius: 4, border: "none", cursor: "pointer", fontSize: 11,
+                      background: "#E8E4DC", color: "#5A5A5A",
+                    }}>💬</button>
+                  </div>
+                  {showProdFb && (
+                    <div style={{ marginTop: 6 }}>
+                      <TemplateSelector
+                        templates={PRODUCT_TEMPLATES}
+                        value={pfb.feedbackText}
+                        onChange={v => setProductFeedbackText(i, pi, v)}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Task feedback toggle */}
+            <button onClick={() => setShowFeedback(!showFeedback)} style={{
+              marginTop: 8, padding: "4px 10px", borderRadius: 6, border: "1px solid #E0DCD4",
+              background: "#fff", fontSize: 11, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit",
+            }}>💬 {showFeedback ? "Hide" : "Add"} Feedback</button>
+
+            {showFeedback && (
+              <div style={{ marginTop: 8 }}>
+                <TemplateSelector
+                  templates={TASK_TEMPLATES}
+                  value={fb.feedbackText}
+                  onChange={v => setTaskFeedbackText(i, v)}
+                />
               </div>
-            ))}
-
-            {fb.rating === "bad" && (
-              <input
-                value={fb.correction || ""}
-                onChange={e => setTaskIssue(i, "correction", e.target.value)}
-                placeholder="What's wrong? (e.g., filter should be 20x20x1)"
-                style={{
-                  width: "100%", padding: "8px 10px", borderRadius: 6, marginTop: 8,
-                  border: "1px solid #E0DCD4", fontSize: 12, fontFamily: "inherit",
-                  boxSizing: "border-box",
-                }}
-              />
             )}
           </div>
         );
       })}
 
-      {/* Overall Notes */}
+      {/* Overall */}
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A", marginBottom: 6 }}>
-          Additional notes (optional):
-        </div>
-        <textarea
-          value={overallNotes}
-          onChange={e => setOverallNotes(e.target.value)}
-          placeholder="Anything else the AI got wrong or should know about this product..."
-          rows={3}
-          style={{
-            width: "100%", padding: "10px 12px", borderRadius: 8,
-            border: "1px solid #E0DCD4", fontSize: 13, fontFamily: "inherit",
-            resize: "vertical", boxSizing: "border-box",
-          }}
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1A1A", marginBottom: 6 }}>Overall notes:</div>
+        <textarea value={overallNotes} onChange={e => setOverallNotes(e.target.value)}
+          placeholder="Anything else the AI should know..."
+          rows={2}
+          style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #E0DCD4", fontSize: 13, fontFamily: "inherit", resize: "vertical", boxSizing: "border-box" }}
         />
       </div>
 
-      <button onClick={handleSave} style={{
+      <button onClick={handleSave} disabled={saving} style={{
         width: "100%", padding: 14, marginTop: 14,
-        background: "#D4932A", color: "#fff", border: "none", borderRadius: 12,
-        fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+        background: saving ? "#E8E4DC" : "#D4932A", color: "#fff",
+        border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700,
+        cursor: saving ? "default" : "pointer", fontFamily: "inherit",
       }}>
-        Save Training Feedback
+        {saving ? "Saving..." : "Save Training Feedback"}
       </button>
     </div>
   );
@@ -206,97 +284,79 @@ export function TrainingPanel({ aiResult, onSaved }) {
 
 export function TrainingExport() {
   const [copied, setCopied] = useState(false);
-  const [showConfirmClear, setShowConfirmClear] = useState(false);
-  const log = getTrainingLog();
+  const [serverCount, setServerCount] = useState(null);
 
-  const handleExport = async () => {
+  const localLog = (() => {
+    try { return JSON.parse(localStorage.getItem("lifekeep_training_log") || "[]"); } catch { return []; }
+  })();
+
+  if (localLog.length === 0 && !serverCount) return null;
+
+  const handleCopyLocal = async () => {
+    const { exportTrainingLog } = await import("./training.js");
     const data = exportTrainingLog();
     try {
       await navigator.clipboard.writeText(data);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
     } catch {
-      // Fallback
       const ta = document.createElement("textarea");
       ta.value = data;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
   };
-
-  const handleClear = () => {
-    clearTrainingLog();
-    setShowConfirmClear(false);
-  };
-
-  if (log.length === 0) return null;
 
   return (
     <div style={{
       background: "#fff", borderRadius: 16, padding: "20px",
       border: "2px solid #D4932A",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
         <span style={{ fontSize: 20 }}>🎯</span>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#1A1A1A" }}>Training Log</div>
-          <div style={{ fontSize: 12, color: "#9A9A9A" }}>{log.length} scan{log.length !== 1 ? "s" : ""} with feedback</div>
+          <div style={{ fontSize: 12, color: "#9A9A9A" }}>{localLog.length} local entries</div>
         </div>
       </div>
 
-      {/* Preview of entries */}
-      <div style={{ marginBottom: 14 }}>
-        {log.slice(-5).map((entry, i) => (
-          <div key={i} style={{
-            display: "flex", justifyContent: "space-between", alignItems: "center",
-            padding: "8px 12px", background: "#F9F8F5", borderRadius: 8, marginBottom: 4,
-            fontSize: 12,
+      {localLog.slice(-5).map((entry, i) => (
+        <div key={i} style={{
+          display: "flex", justifyContent: "space-between",
+          padding: "8px 12px", background: "#F9F8F5", borderRadius: 8, marginBottom: 4, fontSize: 12,
+        }}>
+          <span style={{ color: "#1A1A1A", fontWeight: 600 }}>{entry.aiResult?.item || "Unknown"}</span>
+          <span style={{ color: "#9A9A9A" }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
+        </div>
+      ))}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={handleCopyLocal} style={{
+            flex: 1, padding: 12,
+            background: copied ? "#2D5A3D" : "#D4932A", color: "#fff",
+            border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700,
+            cursor: "pointer", fontFamily: "inherit",
           }}>
-            <span style={{ color: "#1A1A1A", fontWeight: 600 }}>{entry.aiResult?.item || "Unknown"}</span>
-            <span style={{ color: "#9A9A9A" }}>{new Date(entry.timestamp).toLocaleDateString()}</span>
-          </div>
-        ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={handleExport} style={{
-          flex: 1, padding: 12,
-          background: copied ? "#2D5A3D" : "#D4932A",
-          color: "#fff", border: "none", borderRadius: 10,
-          fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-          transition: "background 0.2s",
-        }}>
-          {copied ? "✅ Copied to Clipboard!" : "📋 Export Training Data"}
-        </button>
-        <button onClick={() => setShowConfirmClear(true)} style={{
-          padding: "12px 16px", background: "#F5F3EF", color: "#9A9A9A",
-          border: "none", borderRadius: 10, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
-        }}>🗑️</button>
-      </div>
-
-      {showConfirmClear && (
-        <div style={{
-          marginTop: 10, padding: "12px 16px", background: "#FDF0EE",
-          borderRadius: 10, display: "flex", gap: 8, alignItems: "center",
-        }}>
-          <span style={{ fontSize: 13, color: "#C44B3F", flex: 1 }}>Clear all training data?</span>
-          <button onClick={handleClear} style={{
-            padding: "6px 14px", background: "#C44B3F", color: "#fff",
-            border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
-          }}>Clear</button>
-          <button onClick={() => setShowConfirmClear(false)} style={{
-            padding: "6px 14px", background: "#E8E4DC", color: "#5A5A5A",
-            border: "none", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer",
-          }}>Cancel</button>
+            {copied ? "✅ Copied!" : "📋 Copy to Clipboard"}
+          </button>
+          <a href="/api/training?format=json" download style={{
+            padding: "12px 16px", background: "#5A7ABF", color: "#fff",
+            border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700,
+            textDecoration: "none", textAlign: "center",
+          }}>⬇ JSON</a>
+          <a href="/api/training" download style={{
+            padding: "12px 16px", background: "#2D5A3D", color: "#fff",
+            border: "none", borderRadius: 10, fontSize: 13, fontWeight: 700,
+            textDecoration: "none", textAlign: "center",
+          }}>⬇ TXT</a>
         </div>
-      )}
+      </div>
 
-      <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 10, lineHeight: 1.6 }}>
-        Tap "Export" to copy all feedback to clipboard, then paste it to Claude to refine the scanning prompts.
+      <div style={{ fontSize: 11, color: "#9A9A9A", marginTop: 10, lineHeight: 1.6 }}>
+        Copy to clipboard for pasting to Claude, or download JSON/TXT from the server.
       </div>
     </div>
   );
