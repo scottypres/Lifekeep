@@ -8,7 +8,14 @@ import { TrainingExport } from "./TrainingPanel";
 
 export default function App() {
   const [view, setView] = useState("home");
-  const [mode, setMode] = useState(null); // null = not selected, "user" or "dev"
+  const [mode, setMode] = useState(() => {
+    try { return localStorage.getItem("lifekeep_mode"); } catch { return null; }
+  });
+
+  const setModeAndSave = (m) => {
+    setMode(m);
+    try { localStorage.setItem("lifekeep_mode", m); } catch {}
+  };
 
   // Mode selector on first load
   if (!mode) return (
@@ -26,7 +33,7 @@ export default function App() {
         <p style={{ fontSize: 18, color: "#5A5A5A", fontStyle: "italic", fontFamily: "Georgia, serif", margin: "0 0 40px" }}>Your Life, Maintained</p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <button onClick={() => setMode("user")} style={{
+          <button onClick={() => setModeAndSave("user")} style={{
             background: "#2D5A3D", color: "#fff", border: "none",
             borderRadius: 16, padding: "24px 28px", cursor: "pointer",
             textAlign: "left", boxShadow: "0 4px 16px rgba(45,90,61,0.3)",
@@ -38,7 +45,7 @@ export default function App() {
             </div>
           </button>
 
-          <button onClick={() => setMode("dev")} style={{
+          <button onClick={() => setModeAndSave("dev")} style={{
             background: "linear-gradient(135deg, #D4932A 0%, #C4A265 100%)", color: "#fff", border: "none",
             borderRadius: 16, padding: "24px 28px", cursor: "pointer",
             textAlign: "left", boxShadow: "0 4px 16px rgba(196,162,101,0.3)",
@@ -231,7 +238,7 @@ export default function App() {
 
         <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 24, alignItems: "center" }}>
           <span style={{ fontSize: 12, color: "#9A9A9A" }}>Mode: {mode === "dev" ? "🛠️ Developer" : "👤 User"}</span>
-          <button onClick={() => setMode(mode === "dev" ? "user" : "dev")} style={{
+          <button onClick={() => setModeAndSave(mode === "dev" ? "user" : "dev")} style={{
             padding: "4px 12px", borderRadius: 20, border: "1px solid #E0DCD4",
             background: "#fff", fontSize: 11, color: "#9A9A9A", cursor: "pointer", fontFamily: "inherit",
           }}>Switch</button>
