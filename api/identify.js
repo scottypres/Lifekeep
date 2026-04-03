@@ -22,7 +22,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
+        max_tokens: 3000,
         messages: [{
           role: "user",
           content: [
@@ -32,7 +32,65 @@ export default async function handler(req, res) {
             },
             {
               type: "text",
-              text: "You are a maintenance expert. Look at this photo and:\n\n1. Identify what the item/product is (be as specific as possible — brand, model, type, age estimate if visible)\n2. Determine ALL recurring maintenance tasks this item needs\n3. For each maintenance task, suggest the specific products or supplies needed with Amazon search queries\n\nReturn ONLY valid JSON (no markdown, no backticks, no preamble):\n{\"item\":\"What this item is (be specific)\",\"brand\":\"Brand if identifiable, or null\",\"model\":\"Model if identifiable, or null\",\"category\":\"One of: appliance, vehicle, outdoor, plumbing, electrical, hvac, structure, furniture, electronics, tool, sporting, other\",\"condition\":\"Brief assessment of visible condition if relevant\",\"confidence\":\"high/medium/low\",\"maintenanceSchedule\":[{\"task\":\"Name of maintenance task\",\"interval\":\"How often (e.g. Every 3 months, Annually, Every 25 hours of use)\",\"priority\":\"high/medium/low\",\"difficulty\":\"diy/professional\",\"estimatedCost\":\"$XX-$XX range\",\"description\":\"Brief explanation of why this matters and what happens if skipped\",\"products\":[{\"name\":\"Specific product needed\",\"amazonQuery\":\"specific amazon search query to find this product\"}]}],\"tips\":[\"1-3 pro tips specific to maintaining this item\"],\"lifespanEstimate\":\"Expected lifespan with proper maintenance\"}\n\nBe thorough. Include every maintenance task from routine cleaning to major service intervals. Be specific with product recommendations including sizes, types, and specifications when identifiable. If you can identify the exact brand/model, tailor everything to that specific unit."
+              text: `You are a world-class maintenance expert and product specialist. Analyze this photo to identify the item and create a thorough maintenance plan.
+
+STEP 1 — IDENTIFY WITH MAXIMUM SPECIFICITY:
+- Read ALL visible text: model numbers, serial numbers, specs, labels, stickers, dimensions, ratings
+- Identify exact brand, model, year/generation if possible
+- Note the specific variant, size, capacity, or configuration
+
+STEP 2 — DETERMINE EVERY MAINTENANCE TASK:
+- Think through what this specific item needs to stay in top condition
+- Consider manufacturer-recommended service intervals
+- Include both routine maintenance AND periodic deep maintenance
+- Think about consumable parts, wear items, cleaning, lubrication, calibration, seasonal prep
+
+STEP 3 — DETERMINE EXACT SPECIFICATIONS FOR EVERY PART:
+This is the most critical step. For every product recommendation, you MUST determine the EXACT specification:
+
+Examples of GOOD vs BAD search queries:
+- GOOD: "20x20x1 MERV 11 pleated air filter" — BAD: "air filter for Carrier furnace"
+- GOOD: "Honda GCV170 16 inch mower blade" — BAD: "lawn mower blade"  
+- GOOD: "SAE 10W-30 small engine oil 20oz" — BAD: "lawn mower oil"
+- GOOD: "BG-55 spark plug Bosch WSR6F" — BAD: "leaf blower spark plug"
+- GOOD: "6ft 3/16 inch fuel line small engine" — BAD: "fuel line replacement"
+- GOOD: "Whirlpool W10295370A refrigerator water filter" — BAD: "fridge water filter"
+- GOOD: "Type A pool pump filter cartridge Intex 29000E" — BAD: "pool filter"
+- GOOD: "3M 2097 P100 filter cartridge for respirator" — BAD: "respirator filter"
+
+The rule: EVERY search query must include dimensions, part numbers, exact sizes, model-specific identifiers, or precise specifications. NEVER generate a generic search.
+
+If you can identify the brand and model, cross-reference what specific parts it uses. If you can see a model number, use your knowledge of that product line to determine exact compatible parts.
+
+Return ONLY valid JSON (no markdown, no backticks, no preamble):
+{
+  "item": "Specific item identification (brand, model, type, size/capacity)",
+  "brand": "Brand or null",
+  "model": "Model number/name or null",
+  "category": "appliance/vehicle/outdoor/plumbing/electrical/hvac/structure/furniture/electronics/tool/sporting/other",
+  "condition": "Visible condition assessment or null",
+  "confidence": "high/medium/low",
+  "maintenanceSchedule": [
+    {
+      "task": "Specific maintenance task name",
+      "interval": "How often (e.g., Every 3 months, Every 25 hours, Annually, Every 50 uses)",
+      "priority": "high/medium/low",
+      "difficulty": "diy/professional",
+      "estimatedCost": "$XX-$XX",
+      "description": "Why this matters and what happens if neglected. Include the specific spec or size needed.",
+      "products": [
+        {
+          "name": "Exact product with specification (e.g., '20x20x1 MERV 11 Air Filter' not just 'Air Filter')",
+          "amazonQuery": "highly specific search query with exact dimensions/part numbers/specs"
+        }
+      ]
+    }
+  ],
+  "tips": ["Specific pro tips for THIS exact item, not generic advice"],
+  "lifespanEstimate": "Expected lifespan with proper maintenance"
+}
+
+FINAL CHECK before responding: Review every single amazonQuery. Does it contain specific dimensions, part numbers, or model-specific identifiers? If any query is generic like "replacement filter for [brand]", rewrite it with the actual size or part number. Every query should work as a standalone search that returns the exact right product.`
             }
           ],
         }],
