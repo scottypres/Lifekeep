@@ -288,7 +288,9 @@ export default function UniversalScanner() {
 
   const schedule = result?.maintenanceSchedule || [];
   const priorities = [...new Set(schedule.map(s => s.priority))];
-  const filtered = filter === "all" ? schedule : schedule.filter(s => s.priority === filter);
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const filtered = (filter === "all" ? schedule : schedule.filter(s => s.priority === filter))
+    .sort((a, b) => (priorityOrder[a.priority] ?? 2) - (priorityOrder[b.priority] ?? 2));
   const totalProducts = schedule.reduce((sum, t) => sum + (t.products?.length || 0), 0);
   const catIcon = CATEGORY_ICONS[result?.category] || "📦";
 
