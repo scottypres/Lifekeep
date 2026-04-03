@@ -32,41 +32,56 @@ export default async function handler(req, res) {
             },
             {
               type: "text",
-              text: `You are an expert HVAC technician analyzing a photo of an HVAC unit, furnace, air handler, or its label/nameplate.
+              text: `You are an expert HVAC technician. Analyze this photo of an HVAC unit, furnace, or air handler.
 
-YOUR #1 JOB: Determine the EXACT replacement air filter size this unit needs.
+STEP 1 — READ EVERYTHING:
+Transcribe every piece of text visible: manufacturer, model number, serial number, voltage, amps, BTU rating, all of it. The label may be in English or Spanish.
 
-Step-by-step process:
-1. Read EVERY piece of text visible in the image — model numbers, serial numbers, specs, dimensions, ratings, everything.
-2. From the model number and visible specs, determine the EXACT filter size (e.g., 20x20x1, 16x25x4, 20x25x1). Many model numbers encode the filter size. For example, a model containing "020020" likely means 20x20. Look for any dimensions printed on the unit or label.
-3. If you can see the filter slot or the unit dimensions, use those to determine filter size.
-4. If you cannot determine exact size from the image, state what you DO know and recommend the most likely size based on the unit type and model.
+STEP 2 — IDENTIFY THE EXACT UNIT:
+From the model number, use your knowledge of HVAC product lines to identify:
+- The manufacturer and product series
+- The tonnage/BTU capacity
+- The cabinet configuration and width
+- Any other relevant specifications
 
-CRITICAL RULES FOR SEARCH QUERIES:
-- ALWAYS include the exact filter dimensions in search queries (e.g., "20x20x1 air filter MERV 11" NOT just "air filter for Carrier")
-- ALWAYS include specific part numbers, sizes, or specifications in every search query
-- NEVER generate a vague search like "replacement filter for [brand]" — always include the SIZE or PART NUMBER
-- For additional parts, include exact specifications (e.g., "3/4 inch x 6ft foam weatherstrip" not just "weatherstrip")
+STEP 3 — DETERMINE THE EXACT FILTER SIZE:
+This is your most important job. You must determine the exact air filter dimensions (e.g., 20x20x1, 16x25x4).
+
+USE YOUR TRAINING KNOWLEDGE. You know what filters specific HVAC models use. For example:
+- Rheem RH1PZ series: the model number encodes tonnage and cabinet width. RH1PZ4821 = 4-ton, 21" cabinet = uses 20x20x1 filter.
+- Carrier/Bryant: model numbers often encode filter rack dimensions.
+- Trane/American Standard: look up the specific model's specifications.
+- Goodman/Amana: cabinet width determines filter size.
+
+Do NOT guess randomly. Cross-reference the specific model number with your knowledge of that product line's specifications. If you know what filter a Rheem RH1PZ4821 takes, say so with high confidence.
+
+If you truly cannot determine the size, explain what additional information would help (e.g., "measure the filter slot opening" or "check the existing filter").
+
+STEP 4 — GENERATE SPECIFIC SEARCH QUERIES:
+Every search query MUST include the exact filter dimensions. Example: "20x20x1 air filter MERV 11 pleated" — NEVER "Rheem air filter replacement".
 
 Return ONLY valid JSON (no markdown, no backticks):
 {
   "manufacturer": "Brand name",
-  "modelNumber": "Full model number exactly as shown",
-  "serialNumber": "Serial number if visible, or null",
-  "filterSize": "Exact dimensions like 20x20x1 — this is the most important field",
-  "filterType": "Recommended MERV rating (e.g., MERV 8, MERV 11, MERV 13)",
-  "additionalParts": ["list of other replacement parts this unit may need"],
-  "rawText": "ALL text you can read from the image, transcribed exactly",
+  "modelNumber": "Exact model number from label",
+  "serialNumber": "Serial if visible, or null",
+  "unitType": "e.g., Air Handler, Furnace, Heat Pump, Package Unit",
+  "tonnage": "e.g., 4-ton / 48,000 BTU",
+  "filterSize": "EXACT dimensions like 20x20x1 — be specific and confident",
+  "filterType": "Recommended MERV rating",
+  "howDetermined": "Explain exactly how you determined the filter size — what in the model number or your knowledge told you this",
+  "rawText": "ALL text transcribed from the image",
   "confidence": "high/medium/low",
-  "notes": "How you determined the filter size, plus any maintenance advice",
+  "notes": "Maintenance advice specific to this unit",
   "amazonSearches": [
-    { "label": "Replacement Air Filter (exact size)", "query": "20x20x1 air filter MERV 11 pleated" },
-    { "label": "Premium Air Filter", "query": "20x20x1 MERV 13 air filter Filtrete" },
-    { "label": "Budget Multi-Pack", "query": "20x20x1 air filter 6 pack MERV 8" }
+    { "label": "Standard Filter (exact size)", "query": "[exact dimensions] air filter MERV 8 pleated" },
+    { "label": "Better Filter (exact size)", "query": "[exact dimensions] air filter MERV 11 pleated" },
+    { "label": "Premium Filter (exact size)", "query": "[exact dimensions] air filter MERV 13 Filtrete" },
+    { "label": "Multi-Pack Value (exact size)", "query": "[exact dimensions] air filter 6 pack" }
   ]
 }
 
-The amazonSearches MUST include the exact filter dimensions in every query. Include at least 3 filter options at different MERV ratings/price points. Add any other parts the unit needs (UV bulbs, condensate pan tablets, etc.) with specific sizes.`
+Every amazonSearch query MUST start with the exact filter dimensions. No exceptions.`
             }
           ],
         }],
