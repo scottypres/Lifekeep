@@ -14,6 +14,26 @@ export default function HVACScanner() {
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
 
+  const compressImage = (dataUrl, maxDim = 1200, quality = 0.7) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = dataUrl;
+    });
+  };
+
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -21,11 +41,15 @@ export default function HVACScanner() {
     setResult(null);
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       setPreview(reader.result);
-      const base64 = reader.result.split(",")[1];
-      const mediaType = file.type || "image/jpeg";
-      setImage({ base64, mediaType });
+      const compressed = await compressImage(reader.result);
+      let base64 = compressed.split(",")[1];
+      if (base64.length > 3500000) {
+        const smaller = await compressImage(reader.result, 800, 0.5);
+        base64 = smaller.split(",")[1];
+      }
+      setImage({ base64, mediaType: "image/jpeg" });
     };
     reader.readAsDataURL(file);
   };

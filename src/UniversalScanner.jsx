@@ -127,6 +127,31 @@ export default function UniversalScanner() {
 
   const addLog = (msg) => setDebugLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
+  const compressImage = (dataUrl, maxDim = 1200, quality = 0.7) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        addLog(`Original dimensions: ${width}x${height}`);
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+          addLog(`Resized to: ${width}x${height}`);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", quality);
+        addLog(`Compressed size: ${(compressed.length / 1024).toFixed(1)}KB (quality: ${quality})`);
+        resolve(compressed);
+      };
+      img.src = dataUrl;
+    });
+  };
+
   const handleFile = (e) => {
     try {
       setDebugLog([]);
@@ -140,13 +165,25 @@ export default function UniversalScanner() {
         addLog(`FileReader error: ${reader.error}`);
         setError(`FileReader error: ${reader.error}`);
       };
-      reader.onload = () => {
+      reader.onload = async () => {
         try {
-          addLog(`FileReader done, result length: ${reader.result?.length || 0}`);
+          addLog(`FileReader done, raw size: ${(reader.result?.length / 1024).toFixed(1)}KB`);
           setPreview(reader.result);
-          const base64 = reader.result.split(",")[1];
-          addLog(`Base64 length: ${base64?.length || 0}`);
-          setImage({ base64, mediaType: file.type || "image/jpeg" });
+
+          addLog("Compressing image...");
+          const compressed = await compressImage(reader.result);
+          const base64 = compressed.split(",")[1];
+          addLog(`Final base64: ${(base64.length / 1024).toFixed(1)}KB`);
+
+          if (base64.length > 3500000) {
+            addLog("Still too large, recompressing at lower quality...");
+            const smaller = await compressImage(reader.result, 800, 0.5);
+            const smallBase64 = smaller.split(",")[1];
+            addLog(`Recompressed: ${(smallBase64.length / 1024).toFixed(1)}KB`);
+            setImage({ base64: smallBase64, mediaType: "image/jpeg" });
+          } else {
+            setImage({ base64, mediaType: "image/jpeg" });
+          }
           addLog("Ready to scan");
         } catch (err) {
           addLog(`reader.onload error: ${err.name}: ${err.message}`);
