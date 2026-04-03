@@ -1,6 +1,7 @@
 import { useState } from "react";
 import LifekeepPrototype from "./LifekeepPrototype";
 import VehicleLookup from "./VehicleLookup";
+import HVACScanner from "./HVACScanner";
 
 export default function App() {
   const [view, setView] = useState("home");
@@ -26,6 +27,18 @@ export default function App() {
         fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
       }}>← Back</button>
       <VehicleLookup />
+    </div>
+  );
+
+  if (view === "hvac") return (
+    <div>
+      <button onClick={() => setView("home")} style={{
+        position: "fixed", top: 16, left: 16, zIndex: 9999,
+        background: "#2D5A3D", color: "#fff", border: "none", borderRadius: 10,
+        padding: "8px 16px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+        fontFamily: "'DM Sans', sans-serif", boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      }}>← Back</button>
+      <HVACScanner />
     </div>
   );
 
@@ -83,6 +96,21 @@ export default function App() {
             <div style={{ fontSize: 18, fontWeight: 700, color: "#2D5A3D" }}>Vehicle Maintenance Lookup</div>
             <div style={{ fontSize: 13, color: "#5A5A5A", marginTop: 4, lineHeight: 1.5 }}>
               Enter any year/make/model — get the full maintenance schedule with Amazon affiliate links
+            </div>
+          </button>
+
+          <button onClick={() => setView("hvac")} style={{
+            background: "#fff", color: "#1A1A1A", border: "2px solid #E0DCD4",
+            borderRadius: 16, padding: "22px 28px", cursor: "pointer",
+            textAlign: "left", transition: "transform 0.15s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+          >
+            <div style={{ fontSize: 24, marginBottom: 8 }}>📷</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#2D5A3D" }}>HVAC Label Scanner</div>
+            <div style={{ fontSize: 13, color: "#5A5A5A", marginTop: 4, lineHeight: 1.5 }}>
+              Photograph your HVAC label — AI reads it and links you to the exact replacement filter
             </div>
           </button>
         </div>
