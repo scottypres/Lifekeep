@@ -173,7 +173,7 @@ function ResultCard({ item, index }) {
                 cursor: "pointer", fontFamily: "inherit",
               }}>🎯 Rate This Result</button>
             ) : (
-              <TrainingPanel aiResult={item.result} />
+              <TrainingPanel aiResult={item.result} imagePreview={item.preview} />
             )}
           </div>
         </div>

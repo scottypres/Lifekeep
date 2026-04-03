@@ -612,7 +612,7 @@ export default function UniversalScanner({ mode }) {
             </div>
 
             {/* Training Feedback — dev mode only */}
-            {mode === "dev" && <TrainingPanel aiResult={result} />}
+            {mode === "dev" && <TrainingPanel aiResult={result} imagePreview={preview} />}
 
             {/* Scan another */}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { reset(); handleFile(e); }} style={{ display: "none" }} />

@@ -49,6 +49,19 @@ export default async function handler(req, res) {
       output += `Category: ${entry.aiResult?.category || "Unknown"}\n`;
       output += `Confidence: ${entry.aiResult?.confidence || "Unknown"}\n\n`;
 
+      // Input image data
+      if (entry.inputImage) {
+        output += `### Input Image Data\n`;
+        output += `Description: ${entry.inputImage.imageDescription || "N/A"}\n`;
+        if (entry.inputImage.ocrText) {
+          output += `OCR / Visible Text:\n---\n${entry.inputImage.ocrText}\n---\n`;
+        }
+        if (entry.inputImage.thumbnail && entry.inputImage.thumbnail !== "[saved to server]") {
+          output += `Thumbnail: [base64 image saved — see JSON export for full data]\n`;
+        }
+        output += `\n`;
+      }
+
       if (entry.identificationFeedback) {
         output += `### Identification\n`;
         output += `Correct: ${entry.identificationFeedback.correct ? "YES" : "NO"}\n`;

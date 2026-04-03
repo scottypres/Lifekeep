@@ -133,7 +133,9 @@ Return ONLY valid JSON (no markdown, no backticks):
     }
   ],
   "tips": ["Specific pro tips for THIS exact product — not generic advice"],
-  "lifespanEstimate": "Expected lifespan with proper maintenance"
+  "lifespanEstimate": "Expected lifespan with proper maintenance",
+  "allVisibleText": "Transcribe ALL text visible in the image — every label, sticker, model number, serial number, spec plate, exactly as written",
+  "howDetermined": "Explain step-by-step how you identified this product and determined the specific parts it needs"
 }
 
 FINAL SELF-CHECK: Review every amazonQuery. Does each one contain a specific dimension, part number, or model-specific spec? If ANY query says just "replacement [part] for [brand]" without a size or part number, REWRITE IT with the exact specification.`

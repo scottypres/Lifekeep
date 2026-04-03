@@ -62,7 +62,7 @@ async function saveToServer(entry) {
   }
 }
 
-export function TrainingPanel({ aiResult, onSaved }) {
+export function TrainingPanel({ aiResult, onSaved, imagePreview }) {
   const [identCorrect, setIdentCorrect] = useState(null);
   const [identCorrection, setIdentCorrection] = useState("");
   const [taskFeedback, setTaskFeedback] = useState({});
@@ -99,25 +99,67 @@ export function TrainingPanel({ aiResult, onSaved }) {
     });
   };
 
+  // Compress preview to small thumbnail for training log storage
+  const makeThumbnail = (dataUrl, maxDim = 400, quality = 0.5) => {
+    return new Promise((resolve) => {
+      if (!dataUrl) { resolve(null); return; }
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  };
+
   const handleSave = async () => {
     setSaving(true);
+
+    // Create small thumbnail of original image for training reference
+    const thumbnail = await makeThumbnail(imagePreview);
+
+    // Extract all text the AI read from the image
+    const ocrText = aiResult?.rawText
+      || aiResult?.allVisibleText
+      || aiResult?.howDetermined
+      || null;
+
     const entry = {
       aiResult,
       identificationFeedback: { correct: identCorrect, correction: identCorrection || null },
       taskFeedback: Object.values(taskFeedback),
       overallNotes: overallNotes || null,
+      // Image and OCR data for training context
+      inputImage: {
+        thumbnail, // compressed JPEG ~20-50KB
+        ocrText, // all text the AI read from the label
+        imageDescription: `${aiResult?.item || "Unknown"} — ${aiResult?.brand || ""} ${aiResult?.model || ""}`.trim(),
+      },
     };
 
-    // Save to localStorage
+    // Save to localStorage (without thumbnail to save space)
     try {
+      const localEntry = { ...entry, inputImage: { ...entry.inputImage, thumbnail: "[saved to server]" } };
       const log = JSON.parse(localStorage.getItem("lifekeep_training_log") || "[]");
-      entry.id = Date.now().toString(36);
-      entry.timestamp = new Date().toISOString();
-      log.push(entry);
+      localEntry.id = Date.now().toString(36);
+      localEntry.timestamp = new Date().toISOString();
+      log.push(localEntry);
       localStorage.setItem("lifekeep_training_log", JSON.stringify(log));
     } catch {}
 
-    // Save to server
+    // Save to server (with full thumbnail)
+    entry.id = Date.now().toString(36);
+    entry.timestamp = new Date().toISOString();
     const result = await saveToServer(entry);
     setServerResult(result);
     setSaving(false);
