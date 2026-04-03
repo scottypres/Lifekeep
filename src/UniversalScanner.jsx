@@ -1,9 +1,6 @@
 import { useState, useRef } from "react";
 import { saveReminder, getReminders } from "./reminders.js";
-
-function amazonLink(query) {
-  return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&tag=lifekeep-20`;
-}
+import ProductLinks from "./ProductLinks.jsx";
 
 const CATEGORY_ICONS = {
   appliance: "🏠", vehicle: "🚗", outdoor: "🌿", plumbing: "🔧", electrical: "⚡",
@@ -101,30 +98,9 @@ function MaintenanceCard({ task, index, itemInfo }) {
                 Products Needed ({task.products.length})
               </div>
               {task.products.map((product, i) => (
-                <a
-                  key={i}
-                  href={amazonLink(product.amazonQuery)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "14px 16px", background: "#FFF9EE",
-                    border: "1px solid #F0E6CC", borderRadius: 12,
-                    textDecoration: "none", color: "#1A1A1A",
-                    marginBottom: 8, transition: "background 0.15s",
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 22, flexShrink: 0 }}>🛒</span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 600 }}>{product.name}</div>
-                      <div style={{ fontSize: 11, color: "#C4A265", marginTop: 3 }}>
-                        Amazon · affiliate link
-                      </div>
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 14, color: "#C4A265", fontWeight: 700, flexShrink: 0, marginLeft: 10 }}>Shop →</span>
-                </a>
+                <div key={i} style={{ marginBottom: 10 }}>
+                  <ProductLinks query={product.amazonQuery} name={product.name} />
+                </div>
               ))}
             </div>
           )}

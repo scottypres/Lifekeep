@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import ProductLinks from "./ProductLinks.jsx";
 
 // ─── Vehicle Database (in production this would be API calls to NHTSA + CarMD) ───
 const VEHICLES = {
@@ -122,10 +123,6 @@ const CATEGORY_META = {
   electrical: { icon: "🔋", color: "#C4A265", label: "Electrical" },
 };
 
-function amazonLink(query) {
-  return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&tag=lifekeep-20`;
-}
-
 function getMileageStatus(item, currentMiles) {
   if (!item.intervalMiles) return null;
   const nextDue = Math.ceil(currentMiles / item.intervalMiles) * item.intervalMiles;
@@ -242,56 +239,12 @@ const ScheduleItem = ({ item, currentMiles }) => {
               <div style={{ fontSize: 11, fontWeight: 600, color: "#9A9A9A", letterSpacing: 1, marginBottom: 8, textTransform: "uppercase" }}>
                 Shop Compatible Parts
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {item.part && (
-                  <a
-                    href={amazonLink(item.part)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 14px", background: "#FFF9EE",
-                      border: "1px solid #F0E6CC", borderRadius: 10,
-                      textDecoration: "none", color: "#1A1A1A",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#FFF3DC"}
-                    onMouseLeave={e => e.currentTarget.style.background = "#FFF9EE"}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>🛒</span>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{item.part.split(" ").slice(0, 5).join(" ")}</div>
-                        <div style={{ fontSize: 11, color: "#C4A265", marginTop: 1 }}>Amazon · affiliate link</div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: 13, color: "#C4A265", fontWeight: 600 }}>View →</span>
-                  </a>
+                  <ProductLinks query={item.part} name={item.part.split(" ").slice(0, 5).join(" ")} />
                 )}
                 {item.filter && (
-                  <a
-                    href={amazonLink(item.filter)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 14px", background: "#FFF9EE",
-                      border: "1px solid #F0E6CC", borderRadius: 10,
-                      textDecoration: "none", color: "#1A1A1A",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#FFF3DC"}
-                    onMouseLeave={e => e.currentTarget.style.background = "#FFF9EE"}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>🛒</span>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{item.filter.split(" ").slice(0, 5).join(" ")}</div>
-                        <div style={{ fontSize: 11, color: "#C4A265", marginTop: 1 }}>Amazon · affiliate link</div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: 13, color: "#C4A265", fontWeight: 600 }}>View →</span>
-                  </a>
+                  <ProductLinks query={item.filter} name={item.filter.split(" ").slice(0, 5).join(" ")} />
                 )}
               </div>
             </div>

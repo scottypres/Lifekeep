@@ -1,8 +1,5 @@
 import { useState, useRef } from "react";
-
-function amazonLink(query) {
-  return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&tag=lifekeep-20`;
-}
+import ProductLinks from "./ProductLinks.jsx";
 
 export default function HVACScanner() {
   const [image, setImage] = useState(null);
@@ -346,7 +343,7 @@ export default function HVACScanner() {
               </div>
             )}
 
-            {/* Amazon links */}
+            {/* Product links */}
             {result.amazonSearches && result.amazonSearches.length > 0 && (
               <div>
                 <div style={{
@@ -356,34 +353,9 @@ export default function HVACScanner() {
                   Shop Compatible Parts ({result.amazonSearches.length})
                 </div>
                 {result.amazonSearches.map((item, i) => (
-                  <a
-                    key={i}
-                    href={amazonLink(item.query)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "16px 18px", background: "#fff",
-                      border: "1px solid #E8E4DC", borderRadius: 14,
-                      textDecoration: "none", color: "#1A1A1A",
-                      marginBottom: 10,
-                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, flex: 1, minWidth: 0 }}>
-                      <span style={{ fontSize: 26, flexShrink: 0 }}>🛒</span>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: "#1A1A1A" }}>{item.label}</div>
-                        <div style={{ fontSize: 12, color: "#9A9A9A", marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {item.query}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#C4A265", marginTop: 3, fontWeight: 500 }}>
-                          Amazon · affiliate link
-                        </div>
-                      </div>
-                    </div>
-                    <span style={{ fontSize: 15, color: "#C4A265", fontWeight: 700, flexShrink: 0, marginLeft: 12 }}>Shop →</span>
-                  </a>
+                  <div key={i} style={{ marginBottom: 10 }}>
+                    <ProductLinks query={item.query} name={item.label} />
+                  </div>
                 ))}
               </div>
             )}

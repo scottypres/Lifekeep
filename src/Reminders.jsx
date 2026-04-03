@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { getReminders, removeReminder, markDone, clearAllReminders, getStatus, getDaysUntilDue, getNextDueDate } from "./reminders.js";
-
-function amazonLink(query) {
-  return `https://www.amazon.com/s?k=${encodeURIComponent(query)}&tag=lifekeep-20`;
-}
+import ProductLinks from "./ProductLinks.jsx";
 
 const CATEGORY_ICONS = {
   appliance: "🏠", vehicle: "🚗", outdoor: "🌿", plumbing: "🔧", electrical: "⚡",
@@ -206,24 +203,13 @@ export default function Reminders() {
                             )}
                           </div>
 
-                          {/* Amazon links */}
+                          {/* Product links */}
                           {reminder.products && reminder.products.length > 0 && (
                             <div style={{ marginBottom: 14 }}>
                               {reminder.products.map((p, i) => (
-                                <a key={i} href={amazonLink(p.amazonQuery)} target="_blank" rel="noopener noreferrer" style={{
-                                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                                  padding: "12px 14px", background: "#FFF9EE", border: "1px solid #F0E6CC",
-                                  borderRadius: 10, textDecoration: "none", color: "#1A1A1A", marginBottom: 6,
-                                }}>
-                                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <span style={{ fontSize: 18 }}>🛒</span>
-                                    <div>
-                                      <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                                      <div style={{ fontSize: 11, color: "#C4A265", marginTop: 2 }}>Amazon · affiliate link</div>
-                                    </div>
-                                  </div>
-                                  <span style={{ fontSize: 13, color: "#C4A265", fontWeight: 600 }}>Shop →</span>
-                                </a>
+                                <div key={i} style={{ marginBottom: 8 }}>
+                                  <ProductLinks query={p.amazonQuery} name={p.name} />
+                                </div>
                               ))}
                             </div>
                           )}
