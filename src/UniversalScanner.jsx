@@ -248,6 +248,7 @@ export default function UniversalScanner({ mode }) {
   };
 
   const scanOneModel = async (modelId, apiKeys) => {
+    const modelLabel = MODEL_OPTIONS.find(m => m.id === modelId)?.label || modelId;
     const startTime = Date.now();
     const bodyStr = JSON.stringify({ image: image.base64, mediaType: image.mediaType, model: modelId, apiKeys });
     const resp = await fetch("/api/identify", {
@@ -256,10 +257,28 @@ export default function UniversalScanner({ mode }) {
       body: bodyStr,
     });
     const rawText = await resp.text();
-    const data = JSON.parse(rawText);
     const elapsed = Date.now() - startTime;
-    if (!resp.ok) throw new Error(data.error || `Server ${resp.status}`);
-    if (data.error && !data.maintenanceSchedule) throw new Error(data.error);
+    addLog(`[${modelLabel}] HTTP ${resp.status}, body length: ${rawText.length}`);
+    addLog(`[${modelLabel}] Response preview: ${rawText.slice(0, 250)}`);
+
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      addLog(`[${modelLabel}] JSON parse failed on response: ${parseErr.message}`);
+      throw new Error(`Response not JSON: ${rawText.slice(0, 200)}`);
+    }
+
+    if (!resp.ok) {
+      addLog(`[${modelLabel}] API error: ${data.error || resp.status}`);
+      throw new Error(data.error || `Server ${resp.status}`);
+    }
+    if (data.error && !data.maintenanceSchedule) {
+      addLog(`[${modelLabel}] Data error: ${data.error}`);
+      if (data.raw) addLog(`[${modelLabel}] Raw model output: ${data.raw.slice(0, 300)}`);
+      throw new Error(data.error);
+    }
+    addLog(`[${modelLabel}] Parsed OK — item: ${data.item || "?"}, tasks: ${data.maintenanceSchedule?.length || 0}`);
     return { data, elapsed };
   };
 
