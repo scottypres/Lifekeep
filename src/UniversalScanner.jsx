@@ -680,9 +680,9 @@ export default function UniversalScanner({ mode }) {
 
         {/* ─── Results ─── */}
         {result && (
-          <div>
-            {/* Image thumbnail */}
-            {preview && (
+          <div key={activeResultModel || "single"}>
+            {/* Image thumbnail — hide in multi-model mode since tab bar already shows it */}
+            {preview && Object.keys(allResults).length === 0 && (
               <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 16, border: "1px solid #E8E4DC", maxHeight: 180 }}>
                 <img src={preview} alt="Scanned" style={{ width: "100%", maxHeight: 180, objectFit: "contain", background: "#f5f5f5" }} />
               </div>
