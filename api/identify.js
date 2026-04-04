@@ -191,14 +191,29 @@ export default async function handler(req, res) {
     }
 
     const elapsed = Date.now() - startTime;
-    const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
 
-    try {
-      const parsed = JSON.parse(clean);
+    // Robust JSON extraction — handles markdown fences, preamble text, thinking tags, etc.
+    function extractJSON(raw) {
+      // Try direct parse first
+      try { return JSON.parse(raw.trim()); } catch {}
+      // Strip markdown fences
+      let s = raw.replace(/^```(?:json)?\s*/im, "").replace(/\s*```\s*$/im, "").trim();
+      try { return JSON.parse(s); } catch {}
+      // Find first { to last }
+      const first = raw.indexOf("{");
+      const last = raw.lastIndexOf("}");
+      if (first !== -1 && last > first) {
+        try { return JSON.parse(raw.slice(first, last + 1)); } catch {}
+      }
+      return null;
+    }
+
+    const parsed = extractJSON(text);
+    if (parsed) {
       parsed._meta = { model: selectedModel, provider, elapsed, inputTokens, outputTokens };
       return res.status(200).json(parsed);
-    } catch (parseErr) {
-      return res.status(200).json({ raw: clean, error: "Could not parse structured response", _meta: { model: selectedModel, provider, elapsed } });
+    } else {
+      return res.status(200).json({ raw: text, error: "Could not parse structured response", _meta: { model: selectedModel, provider, elapsed } });
     }
   } catch (err) {
     return res.status(500).json({ error: err.message });

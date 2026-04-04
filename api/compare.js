@@ -144,12 +144,16 @@ async function callGemini(apiKey, model, prompt, image) {
 }
 
 function parseJSON(rawOutput) {
-  const clean = rawOutput.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
-  try {
-    return JSON.parse(clean);
-  } catch {
-    return null;
+  if (!rawOutput) return null;
+  try { return JSON.parse(rawOutput.trim()); } catch {}
+  const s = rawOutput.replace(/^```(?:json)?\s*/im, "").replace(/\s*```\s*$/im, "").trim();
+  try { return JSON.parse(s); } catch {}
+  const first = rawOutput.indexOf("{");
+  const last = rawOutput.lastIndexOf("}");
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(rawOutput.slice(first, last + 1)); } catch {}
   }
+  return null;
 }
 
 export default async function handler(req, res) {
