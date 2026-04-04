@@ -79,54 +79,126 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { image, mediaType } = req.body;
+  const { image, mediaType, model: requestedModel, apiKeys } = req.body;
   if (!image) return res.status(400).json({ error: "No image provided" });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured in Vercel environment variables" });
+  const selectedModel = requestedModel || "claude-sonnet-4-20250514";
+
+  function getProvider(m) {
+    if (m.includes("claude")) return "anthropic";
+    if (m.includes("gpt")) return "openai";
+    if (m.includes("gemini")) return "gemini";
+    return "anthropic";
+  }
+
+  const provider = getProvider(selectedModel);
+
+  function resolveKey(prov) {
+    const overrides = apiKeys || {};
+    const envMap = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY" };
+    return overrides[prov] || process.env[envMap[prov]] || null;
+  }
+
+  const apiKey = resolveKey(provider);
+  if (!apiKey) return res.status(500).json({ error: `No API key for ${provider}. Set the environment variable or provide in request.` });
 
   const prompt = getActivePrompt();
+  const startTime = Date.now();
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 3000,
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mediaType || "image/jpeg", data: image },
-            },
-            {
-              type: "text",
-              text: prompt,
-            }
-          ],
-        }],
-      }),
-    });
+    let response, text, inputTokens = 0, outputTokens = 0;
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(response.status).json({ error: "API error: " + errText.slice(0, 300) });
+    if (provider === "anthropic") {
+      response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          max_tokens: 3000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: mediaType || "image/jpeg", data: image } },
+              { type: "text", text: prompt },
+            ],
+          }],
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: "API error: " + errText.slice(0, 300) });
+      }
+      const data = await response.json();
+      text = data.content.map(c => c.type === "text" ? c.text : "").join("").trim();
+      inputTokens = data.usage?.input_tokens || 0;
+      outputTokens = data.usage?.output_tokens || 0;
+
+    } else if (provider === "openai") {
+      response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: selectedModel,
+          max_tokens: 3000,
+          messages: [{
+            role: "user",
+            content: [
+              { type: "image_url", image_url: { url: `data:image/jpeg;base64,${image}` } },
+              { type: "text", text: prompt },
+            ],
+          }],
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: "API error: " + errText.slice(0, 300) });
+      }
+      const data = await response.json();
+      text = data.choices[0].message.content;
+      inputTokens = data.usage?.prompt_tokens || 0;
+      outputTokens = data.usage?.completion_tokens || 0;
+
+    } else if (provider === "gemini") {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`;
+      response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: mediaType || "image/jpeg", data: image } },
+              { text: prompt },
+            ],
+          }],
+          generationConfig: { maxOutputTokens: 3000 },
+        }),
+      });
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: "API error: " + errText.slice(0, 300) });
+      }
+      const data = await response.json();
+      text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      inputTokens = data.usageMetadata?.promptTokenCount || 0;
+      outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     }
 
-    const data = await response.json();
-    const text = data.content.map(c => c.type === "text" ? c.text : "").join("").trim();
+    const elapsed = Date.now() - startTime;
     const clean = text.replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
 
     try {
-      return res.status(200).json(JSON.parse(clean));
+      const parsed = JSON.parse(clean);
+      parsed._meta = { model: selectedModel, provider, elapsed, inputTokens, outputTokens };
+      return res.status(200).json(parsed);
     } catch (parseErr) {
-      return res.status(200).json({ raw: clean, error: "Could not parse structured response" });
+      return res.status(200).json({ raw: clean, error: "Could not parse structured response", _meta: { model: selectedModel, provider, elapsed } });
     }
   } catch (err) {
     return res.status(500).json({ error: err.message });

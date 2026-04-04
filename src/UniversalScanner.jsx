@@ -156,8 +156,18 @@ export default function UniversalScanner({ mode }) {
   const [filter, setFilter] = useState("all");
   const [allScheduled, setAllScheduled] = useState(false);
   const [debugLog, setDebugLog] = useState([]);
+  const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-20250514");
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
+
+  const MODEL_OPTIONS = [
+    { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", provider: "Anthropic" },
+    { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", provider: "Anthropic" },
+    { id: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
+    { id: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
+    { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
+    { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
+  ];
 
   const addLog = (msg) => setDebugLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
@@ -240,9 +250,13 @@ export default function UniversalScanner({ mode }) {
       addLog(`base64 length: ${image.base64?.length}, type: ${image.mediaType}`);
       setPhase("Preparing request...");
 
+      addLog(`Model: ${selectedModel}`);
+      let apiKeys = {};
+      try { apiKeys = JSON.parse(localStorage.getItem("lifekeep_llm_keys") || "{}"); } catch {}
+
       let bodyStr;
       try {
-        bodyStr = JSON.stringify({ image: image.base64, mediaType: image.mediaType });
+        bodyStr = JSON.stringify({ image: image.base64, mediaType: image.mediaType, model: selectedModel, apiKeys });
         addLog(`JSON body size: ${(bodyStr.length / 1024).toFixed(1)}KB`);
       } catch (jsonErr) {
         addLog(`JSON.stringify failed: ${jsonErr.name}: ${jsonErr.message}`);
@@ -426,6 +440,27 @@ export default function UniversalScanner({ mode }) {
             <div style={{ borderRadius: 16, overflow: "hidden", marginBottom: 20, border: "2px solid #E8E4DC" }}>
               <img src={preview} alt="Preview" style={{ width: "100%", maxHeight: 400, objectFit: "contain", background: "#f5f5f5" }} />
             </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#5A5A5A", display: "block", marginBottom: 6 }}>
+                AI Model
+              </label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                style={{
+                  width: "100%", padding: "10px 12px", borderRadius: 10,
+                  border: "1px solid #E0DCD4", background: "#fff", fontSize: 14,
+                  fontFamily: "inherit", color: "#1A1A1A", cursor: "pointer",
+                  appearance: "auto",
+                }}
+              >
+                {MODEL_OPTIONS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} ({m.provider})
+                  </option>
+                ))}
+              </select>
+            </div>
             <button onClick={handleScan} style={{
               width: "100%", padding: "18px", background: "#2D5A3D", color: "#fff",
               border: "none", borderRadius: 14, fontSize: 17, fontWeight: 700, cursor: "pointer",
@@ -514,6 +549,9 @@ export default function UniversalScanner({ mode }) {
                 )}
                 {result.confidence && (
                   <div><div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, opacity: 0.6 }}>Confidence</div><div style={{ fontSize: 14, fontWeight: 600, marginTop: 2, textTransform: "capitalize" }}>{result.confidence}</div></div>
+                )}
+                {result._meta && (
+                  <div><div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, opacity: 0.6 }}>Model</div><div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{MODEL_OPTIONS.find(m => m.id === result._meta.model)?.label || result._meta.model}{result._meta.elapsed ? ` (${(result._meta.elapsed / 1000).toFixed(1)}s)` : ""}</div></div>
                 )}
               </div>
             </div>
