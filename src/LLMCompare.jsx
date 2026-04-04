@@ -67,13 +67,7 @@ export default function LLMCompare() {
   const [image, setImage] = useState(null); // compressed base64
   const [imagePreview, setImagePreview] = useState(null);
   const [selectedModels, setSelectedModels] = useState(() => {
-    const keys = getApiKeys();
-    const initial = new Set();
-    MODELS.forEach((m) => {
-      const provKey = PROVIDER_KEY_MAP[m.provider];
-      if (keys[provKey]) initial.add(m.id);
-    });
-    return initial;
+    return new Set(MODELS.map((m) => m.id));
   });
   const [currentStep, setCurrentStep] = useState(1);
   const [stepResults, setStepResults] = useState({});
@@ -97,7 +91,9 @@ export default function LLMCompare() {
   function hasProviderKey(provider) {
     const keys = getApiKeys();
     const provKey = PROVIDER_KEY_MAP[provider];
-    return !!keys[provKey];
+    // Client-side keys are optional — server env vars are used as fallback
+    // Always return true so models aren't grayed out
+    return keys[provKey] ? "local" : "env";
   }
 
   function getSelectedOutput(step) {
@@ -158,13 +154,7 @@ export default function LLMCompare() {
   }
 
   function selectAll() {
-    const keys = getApiKeys();
-    const next = new Set();
-    MODELS.forEach((m) => {
-      const provKey = PROVIDER_KEY_MAP[m.provider];
-      if (keys[provKey]) next.add(m.id);
-    });
-    setSelectedModels(next);
+    setSelectedModels(new Set(MODELS.map((m) => m.id)));
   }
 
   function deselectAll() {
@@ -552,7 +542,7 @@ export default function LLMCompare() {
                 </button>
               </div>
               {PROVIDERS_ORDERED.map((provider) => {
-                const providerHasKey = hasProviderKey(provider);
+                const keySource = hasProviderKey(provider);
                 const providerModels = MODELS.filter((m) => m.provider === provider);
                 return (
                   <div key={provider} style={{ marginBottom: 12 }}>
@@ -560,14 +550,14 @@ export default function LLMCompare() {
                       style={{
                         fontSize: 13,
                         fontWeight: 700,
-                        color: providerHasKey ? "#2D5A3D" : "#BBB",
+                        color: "#2D5A3D",
                         marginBottom: 4,
                       }}
                     >
                       {provider}
-                      {!providerHasKey && (
-                        <span style={{ fontWeight: 400, fontSize: 11, marginLeft: 6, color: "#BBB" }}>
-                          (no API key)
+                      {keySource === "env" && (
+                        <span style={{ fontWeight: 400, fontSize: 11, marginLeft: 6, color: "#999" }}>
+                          (using server key)
                         </span>
                       )}
                     </div>
@@ -579,14 +569,14 @@ export default function LLMCompare() {
                           alignItems: "center",
                           gap: 8,
                           padding: "4px 0",
-                          cursor: providerHasKey ? "pointer" : "default",
-                          opacity: providerHasKey ? 1 : 0.4,
+                          cursor: "pointer",
+                          opacity: 1,
                         }}
                       >
                         <input
                           type="checkbox"
                           checked={selectedModels.has(m.id)}
-                          disabled={!providerHasKey}
+                          disabled={false}
                           onChange={() => toggleModel(m.id)}
                         />
                         <span style={{ fontSize: 14 }}>{m.label}</span>
