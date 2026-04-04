@@ -135,7 +135,8 @@ async function callGemini(apiKey, model, prompt, image) {
   }
 
   const data = await res.json();
-  const rawOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const gemParts = data.candidates?.[0]?.content?.parts || [];
+  const rawOutput = gemParts.filter(p => p.text).map(p => p.text).join("\n").trim() || "";
   return {
     rawOutput,
     inputTokens: data.usageMetadata?.promptTokenCount || 0,

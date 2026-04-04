@@ -185,7 +185,10 @@ export default async function handler(req, res) {
         return res.status(response.status).json({ error: "API error: " + errText.slice(0, 300) });
       }
       const data = await response.json();
-      text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      // Gemini with thinking: parts[0] may be thinking, actual text is in a later part
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      text = parts.filter(p => p.text).map(p => p.text).join("\n").trim();
+      if (!text) text = parts[0]?.text || "";
       inputTokens = data.usageMetadata?.promptTokenCount || 0;
       outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     }
@@ -213,7 +216,12 @@ export default async function handler(req, res) {
       parsed._meta = { model: selectedModel, provider, elapsed, inputTokens, outputTokens };
       return res.status(200).json(parsed);
     } else {
-      return res.status(200).json({ raw: text, error: "Could not parse structured response", _meta: { model: selectedModel, provider, elapsed } });
+      return res.status(200).json({
+        raw: text,
+        error: "Could not parse structured response",
+        _debug: { textLength: text.length, firstChars: text.slice(0, 80), lastChars: text.slice(-80) },
+        _meta: { model: selectedModel, provider, elapsed },
+      });
     }
   } catch (err) {
     return res.status(500).json({ error: err.message });

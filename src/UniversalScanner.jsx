@@ -275,6 +275,7 @@ export default function UniversalScanner({ mode }) {
     }
     if (data.error && !data.maintenanceSchedule) {
       addLog(`[${modelLabel}] Data error: ${data.error}`);
+      if (data._debug) addLog(`[${modelLabel}] Debug: len=${data._debug.textLength}, first="${data._debug.firstChars}", last="${data._debug.lastChars}"`);
       if (data.raw) addLog(`[${modelLabel}] Raw model output: ${data.raw.slice(0, 300)}`);
       throw new Error(data.error);
     }
