@@ -125,10 +125,7 @@ async function callGemini(apiKey, model, prompt, image) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ parts }],
-      generationConfig: {
-        maxOutputTokens: 2000,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
+      generationConfig: { maxOutputTokens: 2000 },
     }),
   });
 
