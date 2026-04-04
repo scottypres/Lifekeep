@@ -177,10 +177,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `No API key for ${provider}. Set ${provider === "Anthropic" ? "ANTHROPIC_API_KEY" : provider === "OpenAI" ? "OPENAI_API_KEY" : "GEMINI_API_KEY"} or provide in request.` });
   }
 
-  const startTime = Date.now();
+  const handlerStart = Date.now();
 
   try {
     let result;
+    const apiStart = Date.now();
     if (provider === "Anthropic") {
       result = await callAnthropic(apiKey, model, prompt, step === 1 ? image : null, mediaType);
     } else if (provider === "OpenAI") {
@@ -188,15 +189,21 @@ export default async function handler(req, res) {
     } else {
       result = await callGemini(apiKey, model, prompt, step === 1 ? image : null);
     }
+    const apiElapsed = Date.now() - apiStart;
 
-    const elapsed = Date.now() - startTime;
     const parsed = parseJSON(result.rawOutput);
+    const totalElapsed = Date.now() - handlerStart;
 
     return res.status(200).json({
       model,
       provider,
       step,
-      elapsed,
+      elapsed: totalElapsed,
+      timing: {
+        total: totalElapsed,
+        api: apiElapsed,
+        overhead: totalElapsed - apiElapsed,
+      },
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       estimatedCost: estimateCost(model, result.inputTokens, result.outputTokens),
@@ -205,12 +212,13 @@ export default async function handler(req, res) {
       error: null,
     });
   } catch (err) {
-    const elapsed = Date.now() - startTime;
+    const totalElapsed = Date.now() - handlerStart;
     return res.status(200).json({
       model,
       provider,
       step,
-      elapsed,
+      elapsed: totalElapsed,
+      timing: { total: totalElapsed, api: null, overhead: null },
       inputTokens: 0,
       outputTokens: 0,
       estimatedCost: 0,

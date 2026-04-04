@@ -212,8 +212,9 @@ export default function LLMCompare() {
           }));
         } else {
           const data = await res.json();
+          const t = data.timing || {};
           addDebug(
-            `[${model.label}] OK in ${elapsed}ms — in:${data.inputTokens || "?"} out:${data.outputTokens || "?"}`
+            `[${model.label}] OK — roundtrip:${elapsed}ms, api:${t.api ?? "?"}ms, overhead:${elapsed - (t.api || 0)}ms — in:${data.inputTokens || "?"} out:${data.outputTokens || "?"}`
           );
           setStepResults((prev) => ({
             ...prev,
@@ -225,6 +226,12 @@ export default function LLMCompare() {
                 inputTokens: data.inputTokens || 0,
                 outputTokens: data.outputTokens || 0,
                 elapsed,
+                timing: {
+                  roundtrip: elapsed,
+                  api: t.api || null,
+                  vercel: t.overhead || null,
+                  network: t.api ? elapsed - t.total : null,
+                },
               },
             },
           }));
@@ -677,7 +684,15 @@ export default function LLMCompare() {
                     </div>
                     {result && !result.error && (
                       <div style={{ textAlign: "right", fontSize: 12, color: "#777" }}>
-                        <div>{result.elapsed}ms</div>
+                        <div style={{ fontWeight: 600, color: "#2D5A3D" }}>
+                          {result.timing?.api != null ? `${result.timing.api}ms` : `${result.elapsed}ms`}
+                          <span style={{ fontWeight: 400, color: "#BBB" }}> model</span>
+                        </div>
+                        {result.timing?.api != null && (
+                          <div style={{ fontSize: 11, color: "#BBB" }}>
+                            +{result.timing.roundtrip - result.timing.api}ms network/vercel
+                          </div>
+                        )}
                         <div>
                           in: {result.inputTokens} / out: {result.outputTokens}
                         </div>
