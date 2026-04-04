@@ -74,6 +74,8 @@ export default function LLMCompare() {
   const [stepRatings, setStepRatings] = useState({});
   const [selectedOutputs, setSelectedOutputs] = useState({});
   const [editedOutputs, setEditedOutputs] = useState({});
+  // Per-step overrides: { step1: { type: "model", modelId: "..." } | { type: "edit", value: "..." } | null }
+  const [stepOverrides, setStepOverrides] = useState({});
   const [runningModels, setRunningModels] = useState(new Set());
   const [notes, setNotes] = useState("");
   const [debugPanel, setDebugPanel] = useState(false);
@@ -96,32 +98,60 @@ export default function LLMCompare() {
     return keys[provKey] ? "local" : "env";
   }
 
-  function getSelectedOutput(step) {
+  // Get a specific model's output for a step, or the override if set
+  function getModelOutput(step, modelId) {
     const stepKey = `step${step}`;
-    if (editedOutputs[stepKey]) return editedOutputs[stepKey];
-    const modelId = selectedOutputs[stepKey];
-    if (!modelId) return "";
+    // If there's an override for this step, all models use that
+    const override = stepOverrides[stepKey];
+    if (override) {
+      if (override.type === "edit") return override.value;
+      if (override.type === "model") {
+        const r = stepResults[stepKey]?.[override.modelId];
+        if (r && !r.error) {
+          return typeof r.output === "string" ? r.output : JSON.stringify(r.output, null, 2);
+        }
+      }
+    }
+    // Otherwise use this model's own output
     const result = stepResults[stepKey]?.[modelId];
-    if (!result) return "";
+    if (!result || result.error) return "";
     if (typeof result.output === "string") return result.output;
     return JSON.stringify(result.output, null, 2);
   }
 
-  function buildContext(step) {
+  // Legacy helper for summary/save (uses first available model)
+  function getSelectedOutput(step) {
+    const stepKey = `step${step}`;
+    const override = stepOverrides[stepKey];
+    if (override?.type === "edit") return override.value;
+    if (override?.type === "model") {
+      const r = stepResults[stepKey]?.[override.modelId];
+      if (r && !r.error) return typeof r.output === "string" ? r.output : JSON.stringify(r.output, null, 2);
+    }
+    // Fallback: first non-error result
+    const results = stepResults[stepKey] || {};
+    for (const mid of Object.keys(results)) {
+      const r = results[mid];
+      if (r && !r.error) return typeof r.output === "string" ? r.output : JSON.stringify(r.output, null, 2);
+    }
+    return "";
+  }
+
+  function buildContextForModel(step, modelId) {
     switch (step) {
       case 1:
         return {};
       case 2:
-        return { ocrText: getSelectedOutput(1) };
+        return { ocrText: getModelOutput(1, modelId) };
       case 3:
-        return { identifiedProduct: getSelectedOutput(2) };
+        return { identifiedProduct: getModelOutput(2, modelId) };
       case 4:
         return {
-          identifiedProduct: getSelectedOutput(2),
-          partsSpec: getSelectedOutput(3),
+          identifiedProduct: getModelOutput(2, modelId),
+          partsSpec: getModelOutput(3, modelId),
         };
       case 5:
-        return { partsSpec: getSelectedOutput(3) };
+        return { partsSpec: getModelOutput(3, modelId) };
       default:
         return {};
     }
@@ -165,10 +195,15 @@ export default function LLMCompare() {
   async function runStep() {
     const stepKey = `step${currentStep}`;
     const apiKeys = getApiKeys();
-    const context = buildContext(currentStep);
     const modelsToRun = MODELS.filter((m) => selectedModels.has(m.id));
 
     addDebug(`--- Running Step ${currentStep}: ${STEP_LABELS[currentStep]} ---`);
+    const overrideInfo = stepOverrides[stepKey];
+    if (overrideInfo) {
+      addDebug(`Override active: all models using ${overrideInfo.type === "model" ? overrideInfo.modelId : "custom edit"} for input`);
+    } else if (currentStep > 1) {
+      addDebug(`Each model using its own output from previous steps`);
+    }
     addDebug(`Models: ${modelsToRun.map((m) => m.label).join(", ")}`);
 
     const newRunning = new Set(modelsToRun.map((m) => m.id));
@@ -180,6 +215,7 @@ export default function LLMCompare() {
     const imageBase64 = currentStep === 1 ? image : undefined;
 
     const promises = modelsToRun.map(async (model) => {
+      const context = buildContextForModel(currentStep, model.id);
       const prompt = getPrompt(currentStep, model.id, context);
       const startTime = Date.now();
       addDebug(`[${model.label}] Sending request...`);
@@ -298,6 +334,7 @@ export default function LLMCompare() {
       stepRatings,
       selectedOutputs,
       editedOutputs,
+      stepOverrides,
       selectedModels: [...selectedModels],
       notes,
     });
@@ -656,7 +693,7 @@ export default function LLMCompare() {
               const result = stepResults[stepKey]?.[model.id];
               const isRunning = runningModels.has(model.id);
               const rating = stepRatings[stepKey]?.[model.id];
-              const isSelected = selectedOutputs[stepKey] === model.id;
+              const isSelected = stepOverrides[stepKey]?.type === "model" && stepOverrides[stepKey]?.modelId === model.id;
 
               return (
                 <div
@@ -775,31 +812,35 @@ export default function LLMCompare() {
                             </button>
                           </div>
 
-                          {/* Select radio */}
-                          <label
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              cursor: "pointer",
-                              fontSize: 13,
-                              fontWeight: 600,
-                              color: isSelected ? "#2D5A3D" : "#777",
-                            }}
-                          >
-                            <input
-                              type="radio"
-                              name={`select-${stepKey}`}
-                              checked={isSelected}
-                              onChange={() =>
-                                setSelectedOutputs((prev) => ({
-                                  ...prev,
-                                  [stepKey]: model.id,
-                                }))
-                              }
-                            />
-                            Use for next step
-                          </label>
+                          {/* Override: feed this output to all models */}
+                          {currentStep < 5 && (
+                            <button
+                              onClick={() => {
+                                const sk = `step${currentStep}`;
+                                const current = stepOverrides[sk];
+                                if (current?.type === "model" && current.modelId === model.id) {
+                                  // Toggle off — back to per-model
+                                  setStepOverrides((prev) => ({ ...prev, [sk]: null }));
+                                } else {
+                                  setStepOverrides((prev) => ({ ...prev, [sk]: { type: "model", modelId: model.id } }));
+                                }
+                              }}
+                              style={{
+                                padding: "3px 10px",
+                                borderRadius: 6,
+                                border: `1px solid ${stepOverrides[stepKey]?.type === "model" && stepOverrides[stepKey]?.modelId === model.id ? "#2D5A3D" : "#DDD"}`,
+                                background: stepOverrides[stepKey]?.type === "model" && stepOverrides[stepKey]?.modelId === model.id ? "#E8F5E9" : "#fff",
+                                color: stepOverrides[stepKey]?.type === "model" && stepOverrides[stepKey]?.modelId === model.id ? "#2D5A3D" : "#999",
+                                fontSize: 11,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {stepOverrides[stepKey]?.type === "model" && stepOverrides[stepKey]?.modelId === model.id
+                                ? "&#10003; Feeding all models"
+                                : "Feed all models this"}
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -829,44 +870,82 @@ export default function LLMCompare() {
               );
             })}
 
-            {/* Edit before next step */}
-            {selectedOutputs[`step${currentStep}`] && (
+            {/* Next step controls — show when at least one result is in and nothing is running */}
+            {Object.keys(stepResults[`step${currentStep}`] || {}).some(
+              (k) => !stepResults[`step${currentStep}`][k]?.error
+            ) && runningModels.size === 0 && (
               <div style={styles.card}>
-                <div style={styles.subHeader}>Edit Before Next Step</div>
-                <p style={{ fontSize: 12, color: "#777", margin: "0 0 8px" }}>
-                  Optionally modify the selected output before it is passed to the next step.
-                </p>
-                <textarea
-                  value={
-                    editedOutputs[`step${currentStep}`] !== undefined &&
-                    editedOutputs[`step${currentStep}`] !== null
-                      ? editedOutputs[`step${currentStep}`]
-                      : getSelectedOutput(currentStep)
+                {/* Override status */}
+                {(() => {
+                  const sk = `step${currentStep}`;
+                  const override = stepOverrides[sk];
+                  if (override?.type === "model") {
+                    const m = MODELS.find((mod) => mod.id === override.modelId);
+                    return (
+                      <div style={{ fontSize: 12, color: "#2D5A3D", marginBottom: 8, padding: "6px 10px", background: "#E8F5E9", borderRadius: 6 }}>
+                        Override active: all models will use <strong>{m?.label || override.modelId}</strong>&apos;s output for next step.{" "}
+                        <button onClick={() => setStepOverrides((prev) => ({ ...prev, [sk]: null }))}
+                          style={{ background: "none", border: "none", color: "#C44", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                          Clear
+                        </button>
+                      </div>
+                    );
                   }
-                  onChange={(e) =>
-                    setEditedOutputs((prev) => ({
-                      ...prev,
-                      [`step${currentStep}`]: e.target.value,
-                    }))
+                  if (override?.type === "edit") {
+                    return (
+                      <div style={{ fontSize: 12, color: "#D4932A", marginBottom: 8, padding: "6px 10px", background: "#FFF8E8", borderRadius: 6 }}>
+                        Custom edit override active.{" "}
+                        <button onClick={() => setStepOverrides((prev) => ({ ...prev, [sk]: null }))}
+                          style={{ background: "none", border: "none", color: "#C44", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+                          Clear
+                        </button>
+                      </div>
+                    );
                   }
-                  style={{
-                    width: "100%",
-                    minHeight: 120,
-                    padding: 10,
-                    fontSize: 12,
-                    fontFamily: "monospace",
-                    border: "1px solid #E8E4DC",
-                    borderRadius: 8,
-                    resize: "vertical",
-                    boxSizing: "border-box",
-                  }}
-                />
+                  return currentStep > 1 && currentStep < 5 ? (
+                    <div style={{ fontSize: 12, color: "#777", marginBottom: 8 }}>
+                      Each model will use its own output for the next step. Use &quot;Feed all models this&quot; on a result card or edit below to override.
+                    </div>
+                  ) : null;
+                })()}
+
+                {/* Custom edit override */}
+                {currentStep < 5 && (
+                  <details style={{ marginBottom: 10 }}>
+                    <summary style={{ fontSize: 13, fontWeight: 600, color: "#777", cursor: "pointer" }}>
+                      Override: custom edit for all models
+                    </summary>
+                    <textarea
+                      value={stepOverrides[`step${currentStep}`]?.type === "edit" ? stepOverrides[`step${currentStep}`].value : ""}
+                      placeholder="Paste or type custom input to feed all models in the next step..."
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setStepOverrides((prev) => ({
+                          ...prev,
+                          [`step${currentStep}`]: val ? { type: "edit", value: val } : null,
+                        }));
+                      }}
+                      style={{
+                        width: "100%",
+                        minHeight: 100,
+                        padding: 10,
+                        fontSize: 12,
+                        fontFamily: "monospace",
+                        border: "1px solid #E8E4DC",
+                        borderRadius: 8,
+                        resize: "vertical",
+                        boxSizing: "border-box",
+                        marginTop: 8,
+                      }}
+                    />
+                  </details>
+                )}
+
                 <button
                   style={{
                     ...styles.btn,
                     ...styles.btnPrimary,
                     width: "100%",
-                    marginTop: 10,
                   }}
                   onClick={proceedToNextStep}
                 >
