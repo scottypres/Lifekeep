@@ -157,6 +157,10 @@ export default function UniversalScanner({ mode }) {
   const [allScheduled, setAllScheduled] = useState(false);
   const [debugLog, setDebugLog] = useState([]);
   const [selectedModel, setSelectedModel] = useState("claude-sonnet-4-20250514");
+  // Multi-model state
+  const [allResults, setAllResults] = useState({}); // { modelId: { data, elapsed, error } }
+  const [activeResultModel, setActiveResultModel] = useState(null);
+  const [multiLoading, setMultiLoading] = useState(new Set()); // models currently loading
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
 
@@ -168,6 +172,8 @@ export default function UniversalScanner({ mode }) {
     { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
     { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
   ];
+
+  const isAllMode = selectedModel === "all";
 
   const addLog = (msg) => setDebugLog(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
@@ -241,9 +247,63 @@ export default function UniversalScanner({ mode }) {
     }
   };
 
+  const scanOneModel = async (modelId, apiKeys) => {
+    const startTime = Date.now();
+    const bodyStr = JSON.stringify({ image: image.base64, mediaType: image.mediaType, model: modelId, apiKeys });
+    const resp = await fetch("/api/identify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: bodyStr,
+    });
+    const rawText = await resp.text();
+    const data = JSON.parse(rawText);
+    const elapsed = Date.now() - startTime;
+    if (!resp.ok) throw new Error(data.error || `Server ${resp.status}`);
+    if (data.error && !data.maintenanceSchedule) throw new Error(data.error);
+    return { data, elapsed };
+  };
+
+  const handleScanAll = async () => {
+    if (!image) return;
+    setLoading(true); setError(null); setResult(null);
+    setAllResults({}); setActiveResultModel(null);
+    addLog("=== SCAN ALL MODELS ===");
+
+    let apiKeys = {};
+    try { apiKeys = JSON.parse(localStorage.getItem("lifekeep_llm_keys") || "{}"); } catch {}
+
+    const running = new Set(MODEL_OPTIONS.map(m => m.id));
+    setMultiLoading(running);
+    setPhase(`Scanning with ${MODEL_OPTIONS.length} models...`);
+
+    const promises = MODEL_OPTIONS.map(async (m) => {
+      addLog(`[${m.label}] Starting...`);
+      try {
+        const { data, elapsed } = await scanOneModel(m.id, apiKeys);
+        addLog(`[${m.label}] OK in ${elapsed}ms — ${data.maintenanceSchedule?.length || 0} tasks`);
+        setAllResults(prev => ({ ...prev, [m.id]: { data, elapsed, error: null } }));
+        // Auto-select first successful result
+        setActiveResultModel(prev => prev || m.id);
+      } catch (err) {
+        addLog(`[${m.label}] FAILED: ${err.message}`);
+        setAllResults(prev => ({ ...prev, [m.id]: { data: null, elapsed: 0, error: err.message } }));
+      } finally {
+        setMultiLoading(prev => { const next = new Set(prev); next.delete(m.id); return next; });
+      }
+    });
+
+    await Promise.allSettled(promises);
+    setLoading(false); setPhase("");
+    addLog("=== ALL MODELS DONE ===");
+  };
+
   const handleScan = async () => {
     if (!image) { addLog("No image"); return; }
+
+    if (isAllMode) return handleScanAll();
+
     setLoading(true); setError(null); setResult(null);
+    setAllResults({}); setActiveResultModel(null);
     addLog("=== SCAN START ===");
 
     try {
@@ -454,6 +514,8 @@ export default function UniversalScanner({ mode }) {
                   appearance: "auto",
                 }}
               >
+                <option value="all">All Models (compare)</option>
+                <optgroup label="─────────" disabled />
                 {MODEL_OPTIONS.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.label} ({m.provider})
@@ -503,7 +565,28 @@ export default function UniversalScanner({ mode }) {
               }} />
               <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
               <div style={{ fontSize: 17, fontWeight: 600, color: "#1A1A1A" }}>{phase}</div>
-              <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 6 }}>AI is analyzing your photo</div>
+              <div style={{ fontSize: 13, color: "#9A9A9A", marginTop: 6 }}>
+                {isAllMode ? "Running all models in parallel" : "AI is analyzing your photo"}
+              </div>
+              {/* Per-model progress for all-models mode */}
+              {isAllMode && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", marginTop: 14 }}>
+                  {MODEL_OPTIONS.map((m) => {
+                    const r = allResults[m.id];
+                    const still = multiLoading.has(m.id);
+                    return (
+                      <div key={m.id} style={{
+                        padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                        background: r?.error ? "#FDF0EE" : r?.data ? "#E8F0EA" : "#F5F5F5",
+                        color: r?.error ? "#C44B3F" : r?.data ? "#2D5A3D" : "#999",
+                      }}>
+                        {m.label.split(" ")[0]}{" "}
+                        {still ? "..." : r?.error ? "✗" : r?.data ? `✓ ${(r.elapsed / 1000).toFixed(1)}s` : "—"}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {debugLog.length > 0 && (
                 <div style={{ marginTop: 20, padding: "14px 16px", background: "#1A1A1A", borderRadius: 12, maxHeight: 250, overflowY: "auto", textAlign: "left" }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#4ADE80", marginBottom: 8, letterSpacing: 1 }}>DEBUG LOG</div>
@@ -513,6 +596,65 @@ export default function UniversalScanner({ mode }) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ─── Multi-model results tab bar ─── */}
+        {isAllMode && Object.keys(allResults).length > 0 && !loading && (
+          <div>
+            {/* Image thumbnail */}
+            {preview && (
+              <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 16, border: "1px solid #E8E4DC", maxHeight: 140 }}>
+                <img src={preview} alt="Scanned" style={{ width: "100%", maxHeight: 140, objectFit: "contain", background: "#f5f5f5" }} />
+              </div>
+            )}
+
+            {/* Model tabs */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+              {MODEL_OPTIONS.map((m) => {
+                const r = allResults[m.id];
+                const isActive = activeResultModel === m.id;
+                const isLoading = multiLoading.has(m.id);
+                const hasError = r?.error;
+                const hasData = r?.data;
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => { if (hasData) { setActiveResultModel(m.id); setResult(r.data); setError(null); } }}
+                    disabled={!hasData && !isLoading}
+                    style={{
+                      padding: "8px 12px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                      cursor: hasData ? "pointer" : "default",
+                      fontFamily: "inherit", transition: "all 0.15s",
+                      border: isActive ? "2px solid #2D5A3D" : "1px solid #E0DCD4",
+                      background: isActive ? "#2D5A3D" : hasError ? "#FDF0EE" : hasData ? "#fff" : "#F5F5F5",
+                      color: isActive ? "#fff" : hasError ? "#C44B3F" : hasData ? "#1A1A1A" : "#CCC",
+                    }}
+                  >
+                    <div>{m.label}</div>
+                    <div style={{ fontSize: 10, fontWeight: 400, marginTop: 2, opacity: 0.7 }}>
+                      {isLoading ? "Running..." : hasError ? "Error" : hasData ? `${(r.elapsed / 1000).toFixed(1)}s` : "—"}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Show error for active model if it errored */}
+            {activeResultModel && allResults[activeResultModel]?.error && (
+              <div style={{ padding: "14px 20px", background: "#FDF0EE", borderRadius: 12, fontSize: 13, color: "#C44B3F", lineHeight: 1.6, marginBottom: 16 }}>
+                {MODEL_OPTIONS.find(m => m.id === activeResultModel)?.label}: {allResults[activeResultModel].error}
+              </div>
+            )}
+
+            {/* Scan again */}
+            <button onClick={() => { setResult(null); setAllResults({}); setActiveResultModel(null); setError(null); }} style={{
+              padding: "8px 16px", borderRadius: 10, border: "1px solid #E0DCD4",
+              background: "#fff", fontSize: 12, color: "#777", cursor: "pointer",
+              fontFamily: "inherit", marginBottom: 16,
+            }}>
+              Scan Again
+            </button>
           </div>
         )}
 
