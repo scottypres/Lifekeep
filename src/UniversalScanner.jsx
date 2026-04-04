@@ -620,7 +620,7 @@ export default function UniversalScanner({ mode }) {
         )}
 
         {/* ─── Multi-model results tab bar ─── */}
-        {isAllMode && Object.keys(allResults).length > 0 && !loading && (
+        {Object.keys(allResults).length > 0 && !loading && (
           <div>
             {/* Image thumbnail */}
             {preview && (

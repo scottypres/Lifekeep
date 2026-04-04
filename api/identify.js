@@ -118,7 +118,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           model: selectedModel,
-          max_tokens: 3000,
+          max_tokens: 8000,
           messages: [{
             role: "user",
             content: [
@@ -146,7 +146,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           model: selectedModel,
-          max_tokens: 3000,
+          max_tokens: 8000,
           messages: [{
             role: "user",
             content: [
@@ -177,7 +177,7 @@ export default async function handler(req, res) {
               { text: prompt },
             ],
           }],
-          generationConfig: { maxOutputTokens: 3000 },
+          generationConfig: { maxOutputTokens: 16000 },
         }),
       });
       if (!response.ok) {
